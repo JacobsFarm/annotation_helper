@@ -3,6 +3,8 @@
 A YOLO annotation tool: bounding boxes, segmentation polygons and model-assisted
 labelling, with dataset tools and training in the same window.
 
+<img width="1918" height="1027" alt="Schermafbeelding 2026-09-06 214810" src="https://github.com/user-attachments/assets/937eb61a-7033-46ff-a142-bc1e576837a4" />
+
 An Electron + Svelte shell around a Python engine. The shell owns the canvas and the
 files; Python owns the model and the dataset maths. Either half runs without the other:
 you can annotate with no Python installed, and you can split, check and train a dataset
