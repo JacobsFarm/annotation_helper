@@ -36,8 +36,10 @@ class ProjectClass:
 
 @dataclass(slots=True)
 class ProjectPaths:
+    input: str = "input"  # the inbox; annotating moves an image out of it
     images: str = "images"
     labels: str = "labels"
+    recycle: str = "recycle"  # the bin; nothing is unlinked without an explicit empty
     output: str = "dataset"
 
 
@@ -97,6 +99,11 @@ class Project:
         return self.root / PROJECT_FILENAME
 
     @property
+    def input_dir(self) -> Path:
+        """The inbox. Images wait here until they are annotated."""
+        return self.root / self.paths.input
+
+    @property
     def images_dir(self) -> Path:
         return self.root / self.paths.images
 
@@ -113,8 +120,14 @@ class Project:
         return self.root / STATE_DIRNAME
 
     @property
+    def recycle_dir(self) -> Path:
+        """The bin. A visible folder: what lands here is the user's data, not app state."""
+        return self.root / self.paths.recycle
+
+    @property
     def trash_dir(self) -> Path:
-        return self.state_dir / "trash"
+        """Kept as the old name for callers; the bin itself moved out of state_dir."""
+        return self.recycle_dir
 
     def class_name(self, class_id: int) -> str:
         for c in self.classes:
@@ -227,7 +240,13 @@ def create_project(root: Path, name: str | None = None, task: str = "detect") ->
     """Lay out a new project folder. Idempotent: re-running never destroys data."""
     root = Path(root)
     project = Project(root=root, name=name or root.name, task=task)
-    for directory in (project.images_dir, project.labels_dir, project.state_dir):
+    for directory in (
+        project.input_dir,
+        project.images_dir,
+        project.labels_dir,
+        project.recycle_dir,
+        project.state_dir,
+    ):
         directory.mkdir(parents=True, exist_ok=True)
     (project.state_dir / ".gitignore").write_text("*\n", encoding="utf-8", newline="\n")
     if project.file.exists():

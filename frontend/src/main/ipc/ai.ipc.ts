@@ -1,7 +1,7 @@
 import type { Compute, PredictRequest, PredictResult } from '@shared/ipc'
 import { cancelInstall, installPackages, packageStatus } from '../services/package-service'
 import { openProject } from '../services/project-service'
-import { imagePathFor } from '../services/label-service'
+import { imagePathFor } from '../services/paths'
 import { call, cancel, peekNextId, probe, restart } from '../services/python-service'
 import { handle } from './handle'
 

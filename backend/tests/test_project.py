@@ -14,9 +14,30 @@ from annotation_helper.project import (
 def test_create_lays_out_the_standard_folders(tmp_path):
     project = create_project(tmp_path / "p", name="Demo")
     assert project.file.is_file()
+    assert project.input_dir.is_dir()  # the inbox, where images land before annotating
     assert project.images_dir.is_dir()
     assert project.labels_dir.is_dir()
+    assert project.recycle_dir.is_dir()  # the bin, so a delete always has somewhere to go
     assert (project.root / "classes.txt").read_text().strip() == "object"
+
+
+def test_paths_round_trip_through_the_file(tmp_path):
+    """The inbox is a project setting, so it must survive a save/load like the rest."""
+    project = create_project(tmp_path / "p")
+    project.paths.input = "inbox"
+    project.save()
+
+    reloaded = Project.load(project.file)
+    assert reloaded.paths.input == "inbox"
+    assert reloaded.input_dir == project.root / "inbox"
+
+
+def test_the_bin_is_a_visible_folder_not_application_state(tmp_path):
+    """It holds the user's own files, so deleting `.annotation-helper/` must not take it."""
+    project = create_project(tmp_path / "p")
+    assert project.recycle_dir == project.root / "recycle"
+    assert project.state_dir not in project.recycle_dir.parents
+    assert project.trash_dir == project.recycle_dir  # the old name still resolves
 
 
 def test_create_is_idempotent_and_keeps_edits(tmp_path):

@@ -44,6 +44,29 @@
     if (splitResult) await loadDataset(open.root)
   }
 
+  /** The inbox: images land here, and annotating moves them into `images/`. */
+  async function openInbox(): Promise<void> {
+    if (!open) return
+    await safeCall(() => api.app.openPath(`${open.root}/${open.paths.input}`))
+  }
+
+  /**
+   * Reverse the newest journalled file operation - a trash, or an image promoted out of
+   * the inbox. This is the on-disk undo, which survives a restart; Ctrl+Z on the
+   * annotate screen is the other one, and only covers shapes on the open image.
+   */
+  async function undoFileOp(): Promise<void> {
+    if (!open) return
+    const result = await safeCall(() => api.files.undo(open.root))
+    if (!result) return
+    if (result.undone) {
+      pushToast('success', t('dataset_undo_done'), result.undone)
+      await loadDataset(open.root)
+    } else {
+      pushToast('info', t('dataset_undo_empty'))
+    }
+  }
+
   async function exportConfig(): Promise<void> {
     if (!open) return
     const result = await safeCall(() => api.dataset.exportConfig(open.root))
@@ -63,8 +86,16 @@
   <header><h1>{t('dataset_title')}</h1></header>
 
   <Section title={t('dataset_summary')}>
+    {#snippet actions()}
+      <Button size="sm" icon="folder" onclick={openInbox}>{t('annotate_open_input')}</Button>
+      <Button size="sm" icon="undo" title={t('dataset_undo_file_hint')} onclick={undoFileOp}>
+        {t('dataset_undo_file')}
+      </Button>
+    {/snippet}
+
     <div class="stats">
       <div class="stat"><strong>{summary.total}</strong><span>{t('dataset_images')}</span></div>
+      <div class="stat"><strong>{summary.pending}</strong><span>{t('dataset_pending')}</span></div>
       <div class="stat"><strong>{summary.labelled}</strong><span>{t('dataset_labelled')}</span></div>
       <div class="stat">
         <strong>{summary.total - summary.labelled}</strong><span>{t('dataset_unlabelled')}</span>

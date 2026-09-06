@@ -8,8 +8,9 @@
    * with it.
    */
   import { onMount } from 'svelte'
-  import type { AppSettings, Compute } from '@shared/ipc'
+  import type { AppSettings, Compute, RecycleStatus } from '@shared/ipc'
   import type { AiSettings } from '@shared/project'
+  import { api, safeCall } from '../lib/api'
   import Button from '../lib/components/Button.svelte'
   import Field from '../lib/components/Field.svelte'
   import Icon from '../lib/components/Icon.svelte'
@@ -55,6 +56,8 @@
   let newClassName = $state('')
   let compute = $state<Compute>('auto')
   let logBox = $state<HTMLPreElement | null>(null)
+  let recycle = $state<RecycleStatus | null>(null)
+  let emptying = $state(false)
 
   const open = $derived(project())
   const status = $derived(pythonStatus())
@@ -65,7 +68,39 @@
 
   onMount(() => {
     void refreshPackages()
+    void refreshRecycle()
   })
+
+  async function refreshRecycle(): Promise<void> {
+    if (!open) return
+    recycle = await safeCall(() => api.files.recycle(open.root))
+  }
+
+  /** kB / MB / GB, so "how much would emptying free" is answerable at a glance. */
+  function humanSize(bytes: number): string {
+    const units = ['B', 'kB', 'MB', 'GB']
+    let value = bytes
+    let unit = 0
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024
+      unit++
+    }
+    return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`
+  }
+
+  /**
+   * The one destructive action in the application, so it asks first and says exactly
+   * how many files it is about to take. Everything else here is reversible.
+   */
+  async function empty(): Promise<void> {
+    if (!open || !recycle || recycle.files === 0) return
+    if (!window.confirm(t('settings_recycle_confirm', { files: recycle.files }))) return
+    emptying = true
+    const result = await safeCall(() => api.files.emptyRecycle(open.root))
+    emptying = false
+    if (result) pushToast('success', t('settings_recycle_emptied', { files: result.removed }))
+    await refreshRecycle()
+  }
 
   // Follow the tail while uv talks. Reading `log` is what subscribes this effect.
   $effect(() => {
@@ -147,9 +182,39 @@
       </Field>
     </div>
     <p class="mono muted path">{open?.root}</p>
-    <Button size="sm" icon="folder" onclick={() => open && window.bridge.invoke('app.openPath', open.root)}>
+    <Button size="sm" icon="folder" onclick={() => open && safeCall(() => api.app.openPath(open.root))}>
       {t('common_open_folder')}
     </Button>
+  </Section>
+
+  <Section title={t('settings_recycle')}>
+    {#snippet actions()}
+      <Button size="sm" variant="ghost" icon="refresh" title={t('common_refresh')} onclick={refreshRecycle} />
+    {/snippet}
+
+    <p class="muted">{t('settings_recycle_hint')}</p>
+    {#if recycle}
+      <p>
+        {recycle.files === 0
+          ? t('settings_recycle_empty')
+          : t('settings_recycle_count', { files: recycle.files, size: humanSize(recycle.bytes) })}
+      </p>
+      <p class="mono muted path">{recycle.path}</p>
+      <div class="row">
+        <Button size="sm" icon="folder" onclick={() => safeCall(() => api.app.openPath(recycle!.path))}>
+          {t('common_open_folder')}
+        </Button>
+        <Button
+          size="sm"
+          variant="danger"
+          icon="trash"
+          disabled={recycle.files === 0 || emptying}
+          onclick={empty}
+        >
+          {emptying ? t('settings_recycle_emptying') : t('settings_recycle_empty_action')}
+        </Button>
+      </div>
+    {/if}
   </Section>
 
   <Section title={t('settings_classes')}>
@@ -374,6 +439,12 @@
     font-size: var(--text-xs);
     overflow-wrap: anywhere;
     margin: 0 0 var(--space-2);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .classes {

@@ -30,8 +30,12 @@ export const projectClassSchema = z.object({
 
 export const projectPathsSchema = z
   .object({
+    /** The inbox: images wait here until they are annotated, then move to `images`. */
+    input: z.string().default('input'),
     images: z.string().default('images'),
     labels: z.string().default('labels'),
+    /** The recycle bin: originals and deletions land here, never `unlink`. */
+    recycle: z.string().default('recycle'),
     output: z.string().default('dataset')
   })
   .default({})

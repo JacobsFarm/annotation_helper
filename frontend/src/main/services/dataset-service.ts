@@ -8,12 +8,12 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join, relative } from 'node:path'
-import type { DatasetEntry, DatasetSummary } from '@shared/ipc'
+import type { DatasetEntry, DatasetSummary, ImageArea } from '@shared/ipc'
 import { isImageFile, labelNameFor, parseLabelText } from '@shared/label-io'
 import type { Project } from '@shared/project'
 import { imageUrl } from '../protocol'
 import { readImageSize } from './image-size'
-import { safeJoin, toPosix } from './paths'
+import { areaDir, safeJoin, toPosix } from './paths'
 
 const MAX_DEPTH = 6
 
@@ -39,46 +39,74 @@ async function collect(root: string, dir: string, depth = 0): Promise<string[]> 
   return files
 }
 
+function sorted(files: string[]): string[] {
+  return files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+/**
+ * Everything there is to annotate: the inbox first, then what has already been done.
+ *
+ * The inbox leads because that is the work queue - open the screen and the next image
+ * waiting is the one in front of you. Images that have been annotated stay in the list
+ * below it so they can be reviewed and corrected; they are not archived away.
+ *
+ * A relative path present in both folders is listed once, from `images/`, since that is
+ * the copy the label belongs to. The app never produces such a pair itself - promoting
+ * an image uniques its name - so this only guards a folder someone filled by hand.
+ */
 export async function listDataset(
   project: Project
 ): Promise<{ entries: DatasetEntry[]; summary: DatasetSummary }> {
-  const images = safeJoin(project.root, project.paths.images)
   const labels = safeJoin(project.root, project.paths.labels)
-  const files = (await collect(images, images)).sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-  )
+  const dirs: Record<ImageArea, string> = {
+    input: areaDir(project, 'input'),
+    images: areaDir(project, 'images')
+  }
+
+  const inImages = sorted(await collect(dirs.images, dirs.images))
+  const known = new Set(inImages)
+  const inInput = sorted(await collect(dirs.input, dirs.input)).filter((f) => !known.has(f))
 
   const entries: DatasetEntry[] = []
-  const summary: DatasetSummary = { total: 0, labelled: 0, backgrounds: 0, shapes: 0 }
+  const summary: DatasetSummary = { total: 0, pending: 0, labelled: 0, backgrounds: 0, shapes: 0 }
 
-  for (const file of files) {
-    const imagePath = join(images, file)
-    const size = await readImageSize(imagePath)
-    if (!size) continue
+  const areas: [ImageArea, string[]][] = [
+    ['input', inInput],
+    ['images', inImages]
+  ]
 
-    let shapeCount = 0
-    let labelled = false
-    try {
-      const text = await readFile(join(labels, labelNameFor(file)), 'utf-8')
-      labelled = true
-      shapeCount = parseLabelText(text, size.width, size.height).shapes.length
-    } catch {
-      labelled = false
+  for (const [area, files] of areas) {
+    for (const file of files) {
+      const imagePath = join(dirs[area], file)
+      const size = await readImageSize(imagePath)
+      if (!size) continue
+
+      let shapeCount = 0
+      let labelled = false
+      try {
+        const text = await readFile(join(labels, labelNameFor(file)), 'utf-8')
+        labelled = true
+        shapeCount = parseLabelText(text, size.width, size.height).shapes.length
+      } catch {
+        labelled = false
+      }
+
+      summary.total += 1
+      if (area === 'input') summary.pending += 1
+      if (labelled) summary.labelled += 1
+      if (labelled && shapeCount === 0) summary.backgrounds += 1
+      summary.shapes += shapeCount
+
+      entries.push({
+        file,
+        area,
+        width: size.width,
+        height: size.height,
+        labelled,
+        shapeCount,
+        url: imageUrl(imagePath)
+      })
     }
-
-    summary.total += 1
-    if (labelled) summary.labelled += 1
-    if (labelled && shapeCount === 0) summary.backgrounds += 1
-    summary.shapes += shapeCount
-
-    entries.push({
-      file,
-      width: size.width,
-      height: size.height,
-      labelled,
-      shapeCount,
-      url: imageUrl(imagePath)
-    })
   }
 
   return { entries, summary }

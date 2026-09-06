@@ -38,9 +38,13 @@ export const ERROR_CODES = {
 
 // --- data shapes crossing the boundary --------------------------------------
 
+/** Where an image currently sits. `input` is the inbox; annotating moves it to `images`. */
+export type ImageArea = 'input' | 'images'
+
 export interface DatasetEntry {
-  /** Relative to the images directory, with forward slashes. Survives a folder move. */
+  /** Relative to its area directory, with forward slashes. Survives a folder move. */
   file: string
+  area: ImageArea
   width: number
   height: number
   /** A label file exists. It may be empty, which means verified background. */
@@ -52,9 +56,34 @@ export interface DatasetEntry {
 
 export interface DatasetSummary {
   total: number
+  /** Still in the inbox, waiting to be annotated. */
+  pending: number
   labelled: number
   backgrounds: number
   shapes: number
+}
+
+/** What is sitting in the project's recycle bin right now. */
+export interface RecycleStatus {
+  /** Absolute, so it can be opened in the file explorer. */
+  path: string
+  files: number
+  bytes: number
+}
+
+/**
+ * What a label write did. The image may have moved: annotating is what promotes it out
+ * of the inbox, so the renderer has to be told where it ended up.
+ */
+export interface LabelWriteResult {
+  /** The label file that was written. */
+  path: string
+  /** The image's path relative to its area, which a name collision can change. */
+  imageFile: string
+  area: ImageArea
+  /** A fresh `ah-img://` URL: the old one points at the pre-move location. */
+  url: string
+  moved: boolean
 }
 
 export interface DatasetIssue {
@@ -212,11 +241,14 @@ export interface Api {
   }
   labels: {
     read(input: { root: string; file: string }): Promise<ImageAnnotation>
-    write(input: { root: string; annotation: ImageAnnotation }): Promise<{ path: string }>
+    write(input: { root: string; annotation: ImageAnnotation }): Promise<LabelWriteResult>
   }
   files: {
-    trash(input: { root: string; file: string }): Promise<{ trashed: string }>
+    trash(input: { root: string; file: string; area?: ImageArea }): Promise<{ trashed: string }>
     undo(root: string): Promise<{ undone: string | null }>
+    recycle(root: string): Promise<RecycleStatus>
+    /** Permanent. The only call in this API that destroys a file. */
+    emptyRecycle(root: string): Promise<{ removed: number; bytes: number }>
   }
   ai: {
     status(): Promise<PythonStatus>

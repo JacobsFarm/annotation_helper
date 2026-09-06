@@ -2,6 +2,7 @@ import type { Project, ProjectFile } from '@shared/project'
 import { allowRoot } from '../protocol'
 import {
   createProject,
+  ensureLayout,
   openProject,
   saveProject,
   writeDataYaml
@@ -12,6 +13,7 @@ import { handle } from './handle'
 /** Opening a project is also what grants `ah-img://` access to its folder. */
 async function adopt(project: Project): Promise<Project> {
   allowRoot(project.root)
+  await ensureLayout(project)
   await rememberProject(project.root, project.name)
   return project
 }

@@ -40,8 +40,9 @@ npm run setup     # installs the frontend, then the backend in editable mode
 npm run dev       # the app, with hot reload
 ```
 
-Then **New project**, pick an empty folder, and drop your images into its `images/`
-folder.
+Then **New project**, pick an empty folder, and drop your images into its `input/`
+folder. Annotating one copies it into `images/` with its label in `labels/`, and puts the
+original in `recycle/` — nothing is deleted until you empty that from Settings.
 
 ## Commands
 
@@ -80,10 +81,12 @@ my-project/
 ├── annotation.project.json   settings, classes, thresholds — all paths relative
 ├── classes.txt               one name per line
 ├── data.yaml                 ultralytics dataset descriptor (generated)
-├── images/                   your images
+├── input/                    drop images here to annotate them
+├── images/                   annotated images
 ├── labels/                   YOLO .txt, one per image
+├── recycle/                  originals and deletions, until you empty it
 ├── dataset/                  train/val/test, written by `split`
-└── .annotation-helper/       index cache, file journal, trash — safe to delete
+└── .annotation-helper/       index cache and file journal — safe to delete
 ```
 
 `docs/project-layout.md` describes each of these, including what an *empty* label file

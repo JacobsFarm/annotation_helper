@@ -17,14 +17,17 @@ import type {
   DatasetSummary,
   HealthReport,
   IpcResult,
+  LabelWriteResult,
   PackageStatus,
   PredictRequest,
   PredictResult,
   PythonStatus,
   RecentProject,
+  RecycleStatus,
   SplitResult,
   TrainRun
 } from '@shared/ipc'
+import { toPlain } from '@shared/clone'
 import type { Project, ProjectFile } from '@shared/project'
 import type { ImageAnnotation } from '@shared/shapes'
 import { errorMessage } from '../i18n/index.svelte'
@@ -43,8 +46,13 @@ export class ApiError extends Error {
 
 const bridge: Bridge = (window as unknown as { bridge: Bridge }).bridge
 
+/**
+ * Every call is flattened to plain data first. `$state` hands out Proxies and the
+ * structured clone behind the bridge refuses them, so converting here - once, where no
+ * call site can forget - is what makes saving anything work at all. See `@shared/clone`.
+ */
 async function call<T>(method: string, params?: unknown): Promise<T> {
-  const result = (await bridge.invoke(method, params)) as IpcResult<T>
+  const result = (await bridge.invoke(method, toPlain(params))) as IpcResult<T>
   if (result.ok) return result.data
   throw new ApiError(result.error.code, result.error.message, result.error.detail)
 }
@@ -75,11 +83,13 @@ export const api: Api = {
   },
   labels: {
     read: (input) => call<ImageAnnotation>('labels.read', input),
-    write: (input) => call<{ path: string }>('labels.write', input)
+    write: (input) => call<LabelWriteResult>('labels.write', input)
   },
   files: {
     trash: (input) => call<{ trashed: string }>('files.trash', input),
-    undo: (root) => call<{ undone: string | null }>('files.undo', root)
+    undo: (root) => call<{ undone: string | null }>('files.undo', root),
+    recycle: (root) => call<RecycleStatus>('files.recycle', root),
+    emptyRecycle: (root) => call<{ removed: number; bytes: number }>('files.emptyRecycle', root)
   },
   ai: {
     status: () => call<PythonStatus>('ai.status'),

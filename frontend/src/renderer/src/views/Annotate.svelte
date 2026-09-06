@@ -112,11 +112,17 @@
   }
 
   async function trashCurrent(): Promise<void> {
-    const file = entry?.file
-    if (!file || !projectRoot) return
+    if (!entry || !projectRoot) return
+    const { file, area } = entry
     if (!window.confirm(t('annotate_delete_confirm'))) return
-    const result = await safeCall(() => api.files.trash({ root: projectRoot, file }))
+    const result = await safeCall(() => api.files.trash({ root: projectRoot, file, area }))
     if (result) removeEntry(file)
+  }
+
+  /** The inbox, so dropping images in is one click rather than a path to remember. */
+  async function openInbox(): Promise<void> {
+    const open = project()
+    if (open) await safeCall(() => api.app.openPath(`${open.root}/${open.paths.input}`))
   }
 
   async function predict(): Promise<void> {
@@ -215,13 +221,22 @@
   <aside class="sidebar">
     <div class="panel-head">
       <h3>{t('annotate_images')}</h3>
-      <Button
-        size="sm"
-        variant="ghost"
-        icon="refresh"
-        title={t('common_refresh')}
-        onclick={() => projectRoot && loadDataset(projectRoot)}
-      />
+      <div class="group">
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="folder"
+          title={t('annotate_open_input')}
+          onclick={openInbox}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="refresh"
+          title={t('common_refresh')}
+          onclick={() => projectRoot && loadDataset(projectRoot)}
+        />
+      </div>
     </div>
     <div class="filters">
       {#each FILTERS as id (id)}
@@ -244,6 +259,9 @@
             <span class="dot" class:done={item.labelled} class:background={item.labelled && item.shapeCount === 0}
             ></span>
             <span class="filename">{item.file}</span>
+            {#if item.area === 'input'}
+              <span class="badge" title={t('annotate_pending_hint')}>{t('annotate_pending')}</span>
+            {/if}
             <span class="count muted">{item.shapeCount}</span>
           </button>
         </li>
@@ -251,6 +269,7 @@
         <li class="empty">
           <p>{t('annotate_no_images')}</p>
           <p class="muted">{t('annotate_no_images_hint')}</p>
+          <Button size="sm" icon="folder" onclick={openInbox}>{t('annotate_open_input')}</Button>
         </li>
       {/each}
     </ul>
@@ -706,6 +725,12 @@
     padding: var(--space-4);
     text-align: center;
     font-size: var(--text-sm);
+  }
+
+  .files .empty {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: center;
   }
 
   @media (max-width: 1180px) {

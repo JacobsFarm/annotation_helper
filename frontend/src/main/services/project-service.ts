@@ -62,11 +62,32 @@ export async function createProject(input: {
     task: input.task ?? 'detect',
     root
   }
+  await mkdir(safeJoin(root, project.paths.input), { recursive: true })
   await mkdir(safeJoin(root, project.paths.images), { recursive: true })
   await mkdir(safeJoin(root, project.paths.labels), { recursive: true })
+  await mkdir(safeJoin(root, project.paths.recycle), { recursive: true })
   await mkdir(safeJoin(root, STATE_DIRNAME), { recursive: true })
   await writeFile(safeJoin(root, STATE_DIRNAME, '.gitignore'), '*\n', 'utf-8')
   await saveProject(project)
+  return project
+}
+
+/**
+ * Make sure the folders the app writes into exist.
+ *
+ * Called when a project is opened, not on every request: a project created before the
+ * inbox existed has no `input/`, and the annotate screen would otherwise send people to
+ * a folder that is not there.
+ */
+export async function ensureLayout(project: Project): Promise<Project> {
+  for (const dir of [
+    project.paths.input,
+    project.paths.images,
+    project.paths.labels,
+    project.paths.recycle
+  ]) {
+    await mkdir(safeJoin(project.root, dir), { recursive: true })
+  }
   return project
 }
 

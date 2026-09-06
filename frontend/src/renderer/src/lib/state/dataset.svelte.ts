@@ -10,8 +10,10 @@ import { api, safeCall } from '../api'
 
 export type DatasetFilter = 'all' | 'todo' | 'done'
 
+const EMPTY: DatasetSummary = { total: 0, pending: 0, labelled: 0, backgrounds: 0, shapes: 0 }
+
 let entries = $state<DatasetEntry[]>([])
-let summary = $state<DatasetSummary>({ total: 0, labelled: 0, backgrounds: 0, shapes: 0 })
+let summary = $state<DatasetSummary>({ ...EMPTY })
 let index = $state(0)
 let filter = $state<DatasetFilter>('all')
 let query = $state('')
@@ -101,15 +103,22 @@ export async function loadDataset(root: string): Promise<void> {
 /**
  * Update one row after a save, without a full rescan.
  *
- * Rescanning a large project on every save would make annotating unusable, and the two
- * facts that can change here are exactly these two.
+ * Rescanning a large project on every save would make annotating unusable, and the facts
+ * that can change here are exactly these. `moved` carries the image's new home: saving
+ * is what promotes it out of the inbox, and the `ah-img://` URL of the old location
+ * stops resolving the moment it does.
  */
-export function markEntry(file: string, shapeCount: number): void {
+export function markEntry(
+  file: string,
+  shapeCount: number,
+  moved?: Pick<DatasetEntry, 'file' | 'area' | 'url'>
+): void {
   entries = entries.map((entry) =>
-    entry.file === file ? { ...entry, labelled: true, shapeCount } : entry
+    entry.file === file ? { ...entry, ...moved, labelled: true, shapeCount } : entry
   )
   summary = {
     total: entries.length,
+    pending: entries.filter((e) => e.area === 'input').length,
     labelled: entries.filter((e) => e.labelled).length,
     backgrounds: entries.filter((e) => e.labelled && e.shapeCount === 0).length,
     shapes: entries.reduce((sum, e) => sum + e.shapeCount, 0)
@@ -123,6 +132,6 @@ export function removeEntry(file: string): void {
 
 export function resetDataset(): void {
   entries = []
-  summary = { total: 0, labelled: 0, backgrounds: 0, shapes: 0 }
+  summary = { ...EMPTY }
   index = 0
 }

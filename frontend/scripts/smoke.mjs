@@ -14,7 +14,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
@@ -270,6 +270,78 @@ try {
     skip('the health report sees both label files', 'no python')
     skip('a training command can be built', 'no python')
   }
+
+  // --- the inbox ------------------------------------------------------------
+  //
+  // Dropped in after the app is running, which is also how it happens in practice:
+  // the folder is open in the file explorer and the app rescans on demand.
+  const exists = async (path) => stat(path).then(() => true, () => false)
+  await writeFile(join(projectRoot, 'input', 'fresh.png'), png(WIDTH, HEIGHT))
+
+  const relisted = await evaluate(`window.bridge.invoke('dataset.list', ${root})`)
+  const fresh = relisted.data?.entries?.find((e) => e.file === 'fresh.png')
+  check('an image in input/ is listed', fresh?.area === 'input', JSON.stringify(fresh?.area))
+  check('the inbox leads the list', relisted.data?.entries?.[0]?.file === 'fresh.png')
+  check('the summary counts it as pending', relisted.data?.summary?.pending === 1)
+
+  const promoted = await evaluate(`
+    window.bridge.invoke('labels.write', {
+      root: ${root},
+      annotation: { imageFile: 'fresh.png', width: ${WIDTH}, height: ${HEIGHT}, reviewed: true,
+        shapes: [{ id: 'c', kind: 'box', classId: 0, source: 'manual', x1: 10, y1: 10, x2: 110, y2: 90 }] }
+    })
+  `)
+  check('saving a label reports the move', promoted.data?.moved === true && promoted.data?.area === 'images')
+  check('the image is now in images/', await exists(join(projectRoot, 'images', 'fresh.png')))
+  check('the inbox no longer holds it', !(await exists(join(projectRoot, 'input', 'fresh.png'))))
+  check('the label sits beside it', await exists(join(projectRoot, 'labels', 'fresh.txt')))
+  check(
+    'the original went to the recycle bin, not away',
+    await exists(join(projectRoot, 'recycle', 'images', 'fresh.png'))
+  )
+
+  const afterMove = await evaluate(`window.bridge.invoke('dataset.list', ${root})`)
+  check(
+    'the rescan sees it as annotated',
+    afterMove.data?.entries?.find((e) => e.file === 'fresh.png')?.area === 'images' &&
+      afterMove.data?.summary?.pending === 0
+  )
+  check('the recycle bin is not listed as dataset images', afterMove.data?.entries?.length === IMAGE_COUNT + 1)
+
+  // --- delete, undo, and emptying the bin ------------------------------------
+
+  const trashed = await evaluate(
+    `window.bridge.invoke('files.trash', { root: ${root}, file: 'fresh.png', area: 'images' })`
+  )
+  check('deleting an image succeeds', trashed.ok === true, trashed.error?.code)
+  check('a deleted image is in the bin', await exists(join(projectRoot, 'recycle', 'images', 'fresh (2).png')))
+  check('its label went with it', await exists(join(projectRoot, 'recycle', 'labels', 'fresh.txt')))
+
+  const undone = await evaluate(`window.bridge.invoke('files.undo', ${root})`)
+  check('undo puts the label back', undone.data?.undone !== null && (await exists(join(projectRoot, 'labels', 'fresh.txt'))))
+  const undone2 = await evaluate(`window.bridge.invoke('files.undo', ${root})`)
+  check('undo puts the image back', undone2.data?.undone !== null && (await exists(join(projectRoot, 'images', 'fresh.png'))))
+
+  const bin = await evaluate(`window.bridge.invoke('files.recycle', ${root})`)
+  check('the bin still holds the promoted original', bin.data?.files === 1 && bin.data?.bytes > 0)
+
+  const emptied = await evaluate(`window.bridge.invoke('files.emptyRecycle', ${root})`)
+  check('emptying the bin removes it for good', emptied.data?.removed === 1, emptied.error?.code)
+  check('the bin folder survives, empty', await exists(join(projectRoot, 'recycle')))
+  const binAfter = await evaluate(`window.bridge.invoke('files.recycle', ${root})`)
+  check('the bin reports empty afterwards', binAfter.data?.files === 0)
+
+  // What is left in the journal is the copy into images/, whose source was emptied away.
+  // Undo must skip the entries pointing into the emptied bin rather than report them as
+  // restored, and land on the copy - the one thing it can still reverse.
+  const afterEmpty = await evaluate(`window.bridge.invoke('files.undo', ${root})`)
+  check(
+    'undo skips what the bin no longer holds',
+    afterEmpty.data?.undone?.includes('input') === true && !(await exists(join(projectRoot, 'images', 'fresh.png'))),
+    afterEmpty.data?.undone
+  )
+  const exhausted = await evaluate(`window.bridge.invoke('files.undo', ${root})`)
+  check('an exhausted journal says so', exhausted.data?.undone === null)
 
   cdp.close()
   const failed = results.filter((r) => !r.ok).length

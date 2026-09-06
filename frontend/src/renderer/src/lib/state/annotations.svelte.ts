@@ -192,8 +192,14 @@ export function redo(): void {
 
 // --- saving -----------------------------------------------------------------
 
+/**
+ * Write the label file. This is also what moves the image out of the inbox, so the
+ * result says where it ended up and the in-memory annotation follows it - a rename
+ * during the move would otherwise leave this pointing at a file that no longer exists.
+ */
 export async function saveAnnotation(root: string, quiet = false): Promise<boolean> {
   if (!annotation) return false
+  const was = annotation.imageFile
   saving = true
   const result = await safeCall(() =>
     api.labels.write({ root, annotation: { ...annotation!, reviewed: true } })
@@ -202,8 +208,12 @@ export async function saveAnnotation(root: string, quiet = false): Promise<boole
   if (!result) return false
 
   dirty = false
-  annotation = { ...annotation, reviewed: true }
-  markEntry(annotation.imageFile, annotation.shapes.length)
+  annotation = { ...annotation, imageFile: result.imageFile, reviewed: true }
+  markEntry(was, annotation.shapes.length, {
+    file: result.imageFile,
+    area: result.area,
+    url: result.url
+  })
   if (!quiet) pushToast('success', t('common_saved'))
   return true
 }

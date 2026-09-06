@@ -9,13 +9,14 @@ my-project/
 ├── annotation.project.json    settings, classes, thresholds
 ├── classes.txt                one class name per line, ordered by id
 ├── data.yaml                  ultralytics dataset descriptor (generated)
-├── images/                    your images, sub-folders allowed
+├── input/                     the inbox: drop images here to annotate them
+├── images/                    annotated images, sub-folders allowed
 ├── labels/                    YOLO .txt, mirroring images/
+├── recycle/                   originals and deletions; emptied only on request
 ├── dataset/                   train/val/test, written by `split`
 └── .annotation-helper/        application state — safe to delete at any time
     ├── index.json             image index cache, invalidated on mtime
-    ├── journal.ndjson         every move and delete, for undo
-    └── trash/                 what "delete" actually does
+    └── journal.ndjson         every move and delete, for undo
 ```
 
 ## annotation.project.json
@@ -31,7 +32,10 @@ portable. The application never stores an absolute path in it.
   "classes": [
     { "id": 0, "name": "leaf", "color": "#386938" }
   ],
-  "paths": { "images": "images", "labels": "labels", "output": "dataset" },
+  "paths": {
+    "input": "input", "images": "images", "labels": "labels",
+    "recycle": "recycle", "output": "dataset"
+  },
   "ai": {
     "pipeline": "detect",              // detect | segment | detect_then_segment
     "detectModel": "",                 // absolute path to a .pt, or empty
@@ -70,13 +74,36 @@ Windows backslash in YAML is an escape sequence.
 Editing either by hand works, but the next regeneration overwrites it. Change the project
 file instead.
 
-## images/ and labels/
+## input/, images/ and labels/
+
+`input/` is the inbox. Copy the images you want to annotate into it — sub-folders and
+all — and they appear at the top of the annotate screen, marked as new.
+
+Saving a label is what takes an image out of the inbox. It is **copied** into `images/`,
+keeping whatever sub-folder it was in, the label is written to `labels/`, and the
+original is moved to `recycle/` rather than dropped. So `images/` and `labels/` only ever
+contain work that has been through the annotator, what is left in `input/` is exactly
+what is left to do, and the file the scanner or the camera produced is still on disk
+until you say otherwise.
+
+Both steps are journalled like every other file operation, so both are undoable, and the
+target name is uniqued *before* the label is written: an image whose name is already
+taken in `images/` becomes `name (2).jpg` and gets `name (2).txt` beside it. The pair
+cannot come apart.
+
+A relative path present in both `input/` and `images/` — only possible by filling the
+folders by hand — is listed once, from `images/`, since that is the copy the label
+belongs to. Rename the one in `input/` to get it back.
 
 Sub-folders are allowed and preserved: `images/batch1/a.jpg` gets `labels/batch1/a.txt`.
 Recognised extensions are `.jpg .jpeg .png .bmp .webp .tif .tiff`.
 
 The image list is sorted, case-insensitively and numerically, so "next image" means the
 same thing on every machine and after every rescan.
+
+Nothing outside this application cares about `input/`. `split`, `data.yaml` and every
+health check read `images/` and `labels/`, which is a plain ultralytics dataset with or
+without an inbox beside it.
 
 See [label-format.md](label-format.md) for the contents, and in particular for why an
 empty label file is not the same as a missing one.
@@ -103,5 +130,24 @@ Application state, never data. It carries its own `.gitignore` (`*`), and deleti
 whole folder loses nothing except an index cache and the ability to undo file operations
 from before the deletion.
 
-`trash/` is where deleted images and labels go. Nothing in this application calls
-`unlink` on user data; emptying the trash is a manual act in the file explorer.
+The bin used to live in here. It is now `recycle/`, below, because what is in it is data
+rather than state.
+
+## recycle/
+
+Two things land here:
+
+| What | When |
+|---|---|
+| `recycle/images/` | the original of an annotated image, and any image you delete |
+| `recycle/labels/` | the label of a deleted image |
+
+A visible folder next to `images/`, not something hidden inside `.annotation-helper/`,
+because what is in it is your data and you have to be able to see it. Names are uniqued
+on the way in, so nothing in the bin ever overwrites anything else in it, and every move
+into it is journalled — undo takes it straight back out.
+
+Nothing in this application calls `unlink` on user data except one action: **Settings →
+Recycle bin → Empty permanently**. It says how many files it is about to take and asks
+first. Emptying also drops the journal entries that pointed into the bin, so undo reports
+honestly that those are gone rather than silently doing nothing.
