@@ -38,10 +38,11 @@
   import { settings, updateSettings } from '../lib/state/settings.svelte'
   import { pushToast } from '../lib/state/toast.svelte'
 
-  const SHORTCUTS: { keys: string; label: 'shortcut_next' | 'shortcut_previous' | 'shortcut_save' | 'shortcut_delete' | 'shortcut_tool_select' | 'shortcut_tool_box' | 'shortcut_tool_polygon' | 'shortcut_fit' | 'shortcut_background' | 'shortcut_predict' | 'shortcut_undo' | 'shortcut_class' }[] = [
+  const SHORTCUTS: { keys: string; label: 'shortcut_next' | 'shortcut_previous' | 'shortcut_save' | 'shortcut_skip' | 'shortcut_delete' | 'shortcut_tool_select' | 'shortcut_tool_box' | 'shortcut_tool_polygon' | 'shortcut_fit' | 'shortcut_background' | 'shortcut_predict' | 'shortcut_undo' | 'shortcut_class' }[] = [
     { keys: '→ / PageDown', label: 'shortcut_next' },
     { keys: '← / PageUp', label: 'shortcut_previous' },
-    { keys: 'Ctrl+S', label: 'shortcut_save' },
+    { keys: 'Enter / Ctrl+S', label: 'shortcut_save' },
+    { keys: 'Space', label: 'shortcut_skip' },
     { keys: 'Del', label: 'shortcut_delete' },
     { keys: 'V', label: 'shortcut_tool_select' },
     { keys: 'B', label: 'shortcut_tool_box' },

@@ -12,7 +12,15 @@
   import { toolById } from './tools'
   import ShapeLayer from './ShapeLayer.svelte'
   import Overlay from './Overlay.svelte'
-  import { activeTool, cursorPosition, draft, polygonDraft, setCursorPosition } from '../state/tool.svelte'
+  import {
+    activeTool,
+    cursorPosition,
+    draft,
+    handleHover,
+    polygonDraft,
+    setCursorPosition,
+    setHandleHover
+  } from '../state/tool.svelte'
   import { fit, pan, setContainer, viewport, zoom } from '../state/viewport.svelte'
 
   interface Props {
@@ -39,25 +47,42 @@
   let containerWidth = $state(0)
   let containerHeight = $state(0)
   let panning = $state(false)
-  let spaceHeld = $state(false)
   let lastScreen = { x: 0, y: 0 }
 
   const view = $derived<ViewportTransform>(viewport())
   const tool = $derived(toolById(activeTool()))
   const selectedShape = $derived(shapes.find((s) => s.id === selected[0]) ?? null)
-  const cursor = $derived(
-    panning || spaceHeld || activeTool() === 'pan' ? 'grabbing' : tool.cursor
-  )
+  const hover = $derived(handleHover())
+  const cursor = $derived.by(() => {
+    if (panning || activeTool() === 'pan') return 'grabbing'
+    // The cursor says which of the two dots is under it: grab an existing vertex, or
+    // pull a new one out of an edge midpoint.
+    if (hover?.kind === 'vertex') return 'grab'
+    if (hover?.kind === 'edge') return 'copy'
+    if (hover?.kind === 'close') return 'pointer'
+    return tool.cursor
+  })
 
   $effect(() => {
     setContainer({ width: containerWidth, height: containerHeight })
   })
 
-  // Re-fit whenever a different image arrives, so every image starts fully visible.
+  // Re-fit whenever a different image or a different viewport size arrives, so every
+  // image starts fully visible.
+  //
+  // The key is the whole point. `width` and `height` are props read through the parent's
+  // getters, so this effect re-runs on every shape edit as well - the annotation object
+  // is replaced on each pointer move. Without the guard, dragging a polygon vertex reset
+  // the zoom on every frame. A plain `let` holds the key so comparing it stays outside
+  // the reactive graph.
+  let fittedKey: string | null = null
+
   $effect(() => {
-    if (url && width > 0 && height > 0 && containerWidth > 0) {
-      fit({ width, height })
-    }
+    const key = `${url}|${width}x${height}|${containerWidth}x${containerHeight}`
+    if (!url || width <= 0 || height <= 0 || containerWidth <= 0) return
+    if (key === fittedKey) return
+    fittedKey = key
+    fit({ width, height })
   })
 
   function pointFor(event: MouseEvent): ReturnType<typeof toImage> {
@@ -80,8 +105,9 @@
   function onPointerDown(event: PointerEvent): void {
     host?.setPointerCapture(event.pointerId)
 
-    // Panning works from every tool: middle mouse, or a held space bar.
-    if (event.button === 1 || spaceHeld || activeTool() === 'pan') {
+    // Panning works from every tool with the middle mouse button. Space is not a pan
+    // modifier any more: it skips the image, which is the hotter path while labelling.
+    if (event.button === 1 || activeTool() === 'pan') {
       panning = true
       lastScreen = { x: event.clientX, y: event.clientY }
       event.preventDefault()
@@ -122,19 +148,7 @@
     zoom(anchor, event.deltaY < 0 ? 1.15 : 1 / 1.15)
   }
 
-  function onKeyDown(event: KeyboardEvent): void {
-    if (event.key === ' ' && !spaceHeld) {
-      spaceHeld = true
-      event.preventDefault()
-    }
-  }
-
-  function onKeyUp(event: KeyboardEvent): void {
-    if (event.key === ' ') spaceHeld = false
-  }
 </script>
-
-<svelte:window onkeydown={onKeyDown} onkeyup={onKeyUp} />
 
 <div
   bind:this={host}
@@ -147,7 +161,10 @@
   onpointerdown={onPointerDown}
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
-  onpointerleave={() => setCursorPosition(null)}
+  onpointerleave={() => {
+    setCursorPosition(null)
+    setHandleHover(null)
+  }}
   ondblclick={onDoubleClick}
   onwheel={onWheel}
   oncontextmenu={(event) => event.preventDefault()}
@@ -166,6 +183,7 @@
         draft={draft()}
         polygonDraft={polygonDraft()}
         cursor={cursorPosition()}
+        {hover}
         scale={view.scale}
         image={{ width, height }}
         {showCrosshair}

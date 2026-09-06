@@ -69,12 +69,13 @@ const nl: Record<keyof typeof en, string> = {
   annotate_zoom_actual: 'Werkelijke grootte',
   annotate_previous: 'Vorige afbeelding',
   annotate_next: 'Volgende afbeelding',
-  annotate_save: 'Labels opslaan',
+  annotate_save: 'Labels opslaan (Enter)',
   annotate_mark_background: 'Markeren als achtergrond',
   annotate_mark_background_hint:
-    'Slaat een leeg labelbestand op. Een beeld zonder objecten is trainingsdata, geen gat.',
-  annotate_delete_image: 'Afbeelding naar de prullenbak',
+    'Slaat een leeg labelbestand op (N). Een beeld zonder objecten is trainingsdata, geen gat.',
+  annotate_delete_image: 'Afbeelding naar de prullenbak (spatie)',
   annotate_delete_confirm: 'Deze afbeelding en het label naar de prullenbak van het project verplaatsen?',
+  annotate_skipped: 'Overgeslagen naar de prullenbak',
   annotate_predict: 'Voorspellen',
   annotate_predict_running: 'Bezig met voorspellen…',
   annotate_predict_cancel: 'Voorspelling annuleren',
@@ -112,10 +113,10 @@ const nl: Record<keyof typeof en, string> = {
   // --- annoteren: hints ---
   annotate_hint_box: 'Sleep om een box te tekenen. Esc annuleert.',
   annotate_hint_polygon:
-    'Klik om punten toe te voegen. Enter of dubbelklik sluit, Esc annuleert.',
+    'Klik om punten toe te voegen. Enter of dubbelklik sluit, rechtsklik haalt het laatste punt terug, Esc annuleert.',
   annotate_hint_select:
-    'Klik een vorm om te selecteren. Slepen verplaatst, een handvat sleept de maat.',
-  annotate_hint_pan: 'Sleep om te verschuiven. Middelste muisknop of spatie doet dit altijd.',
+    'Slepen verplaatst, een handvat sleept de maat. Bij een polygoon: trek een klein randbolletje uit voor een nieuw punt, rechtsklik of dubbelklik een punt om het te verwijderen, Shift houdt randen recht.',
+  annotate_hint_pan: 'Sleep om te verschuiven. De middelste muisknop doet dit altijd.',
 
   // --- dataset ---
   dataset_title: 'Dataset',
@@ -255,6 +256,7 @@ const nl: Record<keyof typeof en, string> = {
   shortcut_next: 'Volgende afbeelding',
   shortcut_previous: 'Vorige afbeelding',
   shortcut_save: 'Opslaan',
+  shortcut_skip: 'Afbeelding overslaan naar de prullenbak',
   shortcut_delete: 'Geselecteerde vorm verwijderen',
   shortcut_tool_select: 'Selectiegereedschap',
   shortcut_tool_box: 'Boxgereedschap',

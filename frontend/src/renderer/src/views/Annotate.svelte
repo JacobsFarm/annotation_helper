@@ -57,6 +57,7 @@
   import { activeClassId, classes, colorFor, nameFor, project } from '../lib/state/project.svelte'
   import { setActiveClass } from '../lib/state/project.svelte'
   import { settings } from '../lib/state/settings.svelte'
+  import { pushToast } from '../lib/state/toast.svelte'
   import { activeTool, cursorPosition, setActiveTool, type ToolId } from '../lib/state/tool.svelte'
   import { actualSize, fit, viewport, zoomStep } from '../lib/state/viewport.svelte'
 
@@ -111,12 +112,19 @@
     if (projectRoot) await saveAsBackground(projectRoot)
   }
 
-  async function trashCurrent(): Promise<void> {
+  /**
+   * Move the current image to the project recycle bin. The button asks first; the space
+   * bar does not, because a confirm dialog on every skip would defeat the shortcut. The
+   * recycle bin keeps the file, and the dataset screen can undo the move.
+   */
+  async function trashCurrent(confirmFirst = true): Promise<void> {
     if (!entry || !projectRoot) return
     const { file, area } = entry
-    if (!window.confirm(t('annotate_delete_confirm'))) return
+    if (confirmFirst && !window.confirm(t('annotate_delete_confirm'))) return
     const result = await safeCall(() => api.files.trash({ root: projectRoot, file, area }))
-    if (result) removeEntry(file)
+    if (!result) return
+    removeEntry(file)
+    if (!confirmFirst) pushToast('info', t('annotate_skipped'), file)
   }
 
   /** The inbox, so dropping images in is one click rather than a path to remember. */
@@ -136,6 +144,10 @@
   function onKeyDown(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null
     if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return
+
+    // A focused button already answers to Enter and space with its own click. Leaving
+    // those two alone there stops one keypress from both pressing a button and saving.
+    if (target?.tagName === 'BUTTON' && (event.key === 'Enter' || event.key === ' ')) return
 
     // Tools get first refusal, so Esc and Enter mean what the active tool needs.
     if (toolById(activeTool()).onKeyDown?.(event)) {
@@ -170,6 +182,12 @@
       case 'ArrowLeft':
       case 'PageUp':
         void navigate(-1)
+        break
+      case 'Enter':
+        void save()
+        break
+      case ' ':
+        void trashCurrent(false)
         break
       case 'Delete':
       case 'Backspace':
@@ -340,12 +358,13 @@
           icon="trash"
           title={t('annotate_delete_image')}
           disabled={!entry}
-          onclick={trashCurrent}
+          onclick={() => trashCurrent(true)}
         />
         <Button
           size="sm"
           variant="cta"
           icon="save"
+          title={t('annotate_save')}
           disabled={!annotation || isSaving()}
           onclick={save}
         >

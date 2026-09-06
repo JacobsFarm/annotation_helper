@@ -70,12 +70,13 @@ export default {
   annotate_zoom_actual: 'Actual size',
   annotate_previous: 'Previous image',
   annotate_next: 'Next image',
-  annotate_save: 'Save labels',
+  annotate_save: 'Save labels (Enter)',
   annotate_mark_background: 'Mark as background',
   annotate_mark_background_hint:
-    'Saves an empty label file. An image with no objects is training data, not a gap.',
-  annotate_delete_image: 'Move image to the recycle bin',
+    'Saves an empty label file (N). An image with no objects is training data, not a gap.',
+  annotate_delete_image: 'Move image to the recycle bin (space)',
   annotate_delete_confirm: 'Move this image and its label to the project recycle bin?',
+  annotate_skipped: 'Skipped to the recycle bin',
   annotate_predict: 'Predict',
   annotate_predict_running: 'Predicting…',
   annotate_predict_cancel: 'Cancel prediction',
@@ -112,9 +113,11 @@ export default {
 
   // --- annotate: hints ---
   annotate_hint_box: 'Drag to draw a box. Esc cancels.',
-  annotate_hint_polygon: 'Click to add points. Enter or double-click closes, Esc cancels.',
-  annotate_hint_select: 'Click a shape to select it. Drag to move, drag a handle to resize.',
-  annotate_hint_pan: 'Drag to pan. Middle mouse or space does this from any tool.',
+  annotate_hint_polygon:
+    'Click to add points. Enter or double-click closes, right-click takes the last point back, Esc cancels.',
+  annotate_hint_select:
+    'Drag to move, drag a handle to resize. On a polygon: pull a small edge dot out for a new point, right-click or double-click a point to remove it, hold Shift for straight edges.',
+  annotate_hint_pan: 'Drag to pan. The middle mouse button does this from any tool.',
 
   // --- dataset ---
   dataset_title: 'Dataset',
@@ -253,6 +256,7 @@ export default {
   shortcut_next: 'Next image',
   shortcut_previous: 'Previous image',
   shortcut_save: 'Save',
+  shortcut_skip: 'Skip image to the recycle bin',
   shortcut_delete: 'Delete selected shape',
   shortcut_tool_select: 'Select tool',
   shortcut_tool_box: 'Box tool',

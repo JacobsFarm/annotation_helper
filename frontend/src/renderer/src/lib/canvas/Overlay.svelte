@@ -7,23 +7,36 @@
    */
   import type { Shape } from '@shared/shapes'
   import { normaliseBox } from '@shared/shapes'
-  import { boxHandles } from './tools/select'
-  import type { DraftBox } from '../state/tool.svelte'
+  import { boxHandles, edgeMidpoints, MIDPOINT_MIN_EDGE } from './tools/select'
+  import type { DraftBox, HandleHover } from '../state/tool.svelte'
 
   interface Props {
     selected: Shape | null
     draft: DraftBox | null
     polygonDraft: [number, number][]
     cursor: { x: number; y: number } | null
+    hover: HandleHover | null
     scale: number
     image: { width: number; height: number }
     showCrosshair: boolean
   }
 
-  const { selected, draft, polygonDraft, cursor, scale, image, showCrosshair }: Props = $props()
+  const {
+    selected,
+    draft,
+    polygonDraft,
+    cursor,
+    hover,
+    scale,
+    image,
+    showCrosshair
+  }: Props = $props()
 
   const stroke = $derived(1.5 / scale)
   const handleSize = $derived(8 / scale)
+  // Midpoints are drawn smaller than vertices so a glance separates "a point that exists"
+  // from "a point you can pull out of the edge".
+  const midpointSize = $derived(5.5 / scale)
 </script>
 
 <!-- Crosshair: the cheapest way to line a box edge up with something across the frame. -->
@@ -54,7 +67,15 @@
     stroke-width={stroke * 1.5}
   />
   {#each polygonDraft as [x, y], index (index)}
-    <circle class="vertex" cx={x} cy={y} r={handleSize / 2} stroke-width={stroke} />
+    {@const closing = index === 0 && hover?.kind === 'close'}
+    <circle
+      class="vertex"
+      class:hovered={closing}
+      cx={x}
+      cy={y}
+      r={closing ? handleSize * 0.8 : handleSize / 2}
+      stroke-width={stroke}
+    />
   {/each}
 {/if}
 
@@ -72,8 +93,27 @@
       />
     {/each}
   {:else}
+    <!-- Midpoints first: a vertex drawn on top of one always wins the click. -->
+    {#each edgeMidpoints(selected, handleSize * MIDPOINT_MIN_EDGE) as mid (mid.index)}
+      <circle
+        class="midpoint"
+        class:hovered={hover?.kind === 'edge' && hover.index === mid.index}
+        cx={mid.x}
+        cy={mid.y}
+        r={midpointSize / 2}
+        stroke-width={stroke}
+      />
+    {/each}
     {#each selected.points as [x, y], index (index)}
-      <circle class="handle-round" cx={x} cy={y} r={handleSize / 2} stroke-width={stroke} />
+      {@const hovered = hover?.kind === 'vertex' && hover.index === index}
+      <circle
+        class="handle-round"
+        class:hovered
+        cx={x}
+        cy={y}
+        r={(hovered ? handleSize * 1.35 : handleSize) / 2}
+        stroke-width={stroke}
+      />
     {/each}
   {/if}
 {/if}
@@ -101,5 +141,23 @@
   .vertex {
     fill: var(--bg-raised);
     stroke: var(--selection);
+  }
+
+  /* Hollow and half-there until you reach for it: an edge midpoint is an offer, not a
+     point that exists in the label file yet. */
+  .midpoint {
+    fill: var(--bg-raised);
+    fill-opacity: 0.5;
+    stroke: var(--selection);
+    stroke-opacity: 0.55;
+  }
+
+  .midpoint.hovered,
+  .handle-round.hovered,
+  .vertex.hovered {
+    fill: var(--selection);
+    fill-opacity: 1;
+    stroke: var(--bg-raised);
+    stroke-opacity: 1;
   }
 </style>
