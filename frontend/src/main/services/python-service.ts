@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { ERROR_CODES, type PythonStatus } from '@shared/ipc'
 import { ServiceError } from './errors'
-import { bundledPython, packagePaths } from './runtime-paths'
+import { bundledPackages, bundledPython, packagePaths } from './runtime-paths'
 import { loadSettings } from './settings-service'
 
 const REQUEST_TIMEOUT_MS = 15 * 60 * 1000 // a training start can be slow to acknowledge
@@ -71,22 +71,29 @@ function backendRoot(): string {
  * message and exits - which is why `launch` verifies each candidate actually answers
  * instead of assuming the first one spawned is the right one.
  *
- * The bundled interpreter sits above everything the machine offers but below an explicit
- * choice: it is the one this build knows has the right packages, yet a user who typed a
- * path into Settings meant it.
+ * Where the bundled interpreter sits depends on what the build carries, and the
+ * difference is the whole point. A build that ships its own ultralytics and torch leads
+ * with its own interpreter: that CUDA build is what it promised, and second-guessing it
+ * would make the download pointless. A build that ships only an interpreter puts it
+ * *last*, so a machine that already has a working ultralytics keeps using it rather than
+ * being asked to download a second copy of something it has. Either way the bundled one
+ * is there as the floor, which is what makes the app work with no Python at all.
  */
 async function interpreters(): Promise<string[]> {
   const configured = (await loadSettings()).pythonPath.trim()
-  const candidates = [
-    configured,
-    working ?? '',
-    process.env.ANNOTATION_HELPER_PYTHON ?? '',
-    bundledPython() ?? '',
+  const bundled = bundledPython() ?? ''
+  const onThisMachine = [
     'python',
     'python3',
     'C:\\ProgramData\\anaconda3\\python.exe',
     join(process.env.USERPROFILE ?? '', 'anaconda3', 'python.exe'),
     join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Python', 'Python312', 'python.exe')
+  ]
+  const candidates = [
+    configured,
+    working ?? '',
+    process.env.ANNOTATION_HELPER_PYTHON ?? '',
+    ...(bundledPackages() ? [bundled, ...onThisMachine] : [...onThisMachine, bundled])
   ]
   // Absolute paths are checked on disk; bare names are left to PATH resolution.
   const usable = candidates.filter((c) => c && (!/[\\/]/.test(c) || existsSync(c)))

@@ -85,7 +85,10 @@ export async function installPackages(compute: Compute): Promise<PackageStatus> 
   }
 
   const uv = bundledUv()
-  const python = bundledPython() ?? getStatus().executable
+  // The interpreter actually running the engine, not necessarily the bundled one: the
+  // wheels are built per Python version, so installing 3.12 wheels for a machine's 3.11
+  // would produce a directory nothing can import.
+  const python = getStatus().executable ?? bundledPython()
   if (!uv || !python) {
     throw new ServiceError(
       ERROR_CODES.packagesUnavailable,
