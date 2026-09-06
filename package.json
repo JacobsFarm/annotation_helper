@@ -1,0 +1,23 @@
+{
+  "name": "annotation-helper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Annotation Helper - a YOLO annotation tool. Electron + Svelte shell, Python engine.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "npm run setup:frontend && npm run setup:backend",
+    "setup:frontend": "npm --prefix frontend install",
+    "setup:backend": "python -m pip install -e backend[dev]",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "dist": "npm --prefix frontend run dist",
+    "check": "npm --prefix frontend run check",
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "npm --prefix frontend run test",
+    "test:backend": "python -m pytest backend/tests -q",
+    "ah": "python -m annotation_helper"
+  }
+}

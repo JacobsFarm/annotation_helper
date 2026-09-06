@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "annotation-helper"
+version = "0.1.0"
+description = "YOLO annotation engine: label I/O, dataset tools, training and an AI sidecar."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+# The core (labels, dataset tools, project files) deliberately has zero dependencies,
+# so it stays importable in any environment. Heavy extras are opt-in.
+[project.optional-dependencies]
+ai = ["ultralytics>=8.3", "pillow>=10.0"]
+dev = ["pytest>=8.0", "pillow>=10.0"]
+
+[project.scripts]
+annotation-helper = "annotation_helper.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

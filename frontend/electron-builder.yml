@@ -1,0 +1,38 @@
+appId: com.annotationhelper.app
+productName: Annotation Helper
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**
+  - package.json
+
+# The Python engine ships alongside the app rather than inside the asar, so
+# `python -m annotation_helper sidecar` can import it. `python-service.ts` points
+# PYTHONPATH here when the app is packaged.
+extraResources:
+  - from: ../backend/src
+    to: backend/src
+    filter:
+      - '**/*.py'
+  - from: ../backend/pyproject.toml
+    to: backend/pyproject.toml
+
+win:
+  target: nsis
+  artifactName: ${productName}-${version}-setup.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+
+linux:
+  target: AppImage
+  category: Graphics
+
+mac:
+  target: dmg
+  category: public.app-category.graphics-design

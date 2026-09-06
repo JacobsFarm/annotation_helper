@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      default-src 'self' keeps everything local. Two deliberate additions:
+        img-src ... ah-img:   the custom protocol that serves project images
+        connect-src ... ws:   Vite's HMR socket in development
+      A Google Fonts link would simply be blocked, which is why fonts are self-hosted.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' ah-img: data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*; script-src 'self'"
+    />
+    <title>Annotation Helper</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

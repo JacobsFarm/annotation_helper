@@ -1,0 +1,37 @@
+{
+  "name": "annotation-helper-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell + Svelte renderer for Annotation Helper",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "npm run check && electron-vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.web.json && tsc -p tsconfig.node.json --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node scripts/smoke.mjs",
+    "test:watch": "vitest",
+    "dist": "npm run build && electron-builder --win --config electron-builder.yml"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/node": "^22.10.5",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
+    "svelte": "^5.19.0",
+    "svelte-check": "^4.1.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^3.0.2"
+  }
+}

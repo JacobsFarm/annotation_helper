@@ -1,0 +1,35 @@
+# --- node / electron ---
+node_modules/
+frontend/out/
+frontend/dist/
+frontend/release/
+*.tsbuildinfo
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+backend/dist/
+
+# --- app runtime ---
+# Per-project app state lives inside the annotation project, never in the repo.
+.annotation-helper/
+*.local.json
+
+# --- models & data (never commit weights or datasets) ---
+*.pt
+*.onnx
+datasets/
+runs/
+
+# --- os / editor ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

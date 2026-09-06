@@ -1,0 +1,124 @@
+/*
+ * Design tokens. No component contains a literal colour.
+ *
+ * oklch, not hex: lightness steps stay perceptually even and an alpha variant is
+ * `oklch(... / 0.16)` without needing a second token.
+ *
+ * A brand colour is not automatically a UI colour. Emerald 500 sits at 42% lightness,
+ * which fails contrast for text on a dark ground - so dark mode steps up to emerald 300
+ * while light mode keeps 500. That mapping lives here and nowhere else.
+ */
+
+:root {
+  /* --- brand ramp: emerald #386938 (RAL 6001), hue 145 --- */
+  --emerald-50: oklch(97% 0.02 145);
+  --emerald-100: oklch(93% 0.035 145);
+  --emerald-200: oklch(87% 0.055 145);
+  --emerald-300: oklch(78% 0.08 145);
+  --emerald-400: oklch(62% 0.09 145);
+  --emerald-500: oklch(42% 0.08 145);
+  --emerald-600: oklch(36% 0.07 145);
+  --emerald-700: oklch(30% 0.06 145);
+  --emerald-800: oklch(24% 0.05 145);
+  --emerald-900: oklch(18% 0.035 145);
+
+  /* --- accents --- */
+  --amber: oklch(65% 0.16 75); /* the single highest-visibility action on screen */
+  --amber-strong: oklch(58% 0.17 75);
+  --teal: oklch(60% 0.09 195);
+  --danger: oklch(58% 0.19 27); /* the palette defines no red; destructive needs one */
+  --danger-strong: oklch(50% 0.2 27);
+
+  /* --- neutrals --- */
+  --white: oklch(99% 0.003 145);
+  --off-white: oklch(98% 0.005 145);
+  --gray-100: oklch(95% 0.007 145);
+  --gray-200: oklch(90% 0.008 145);
+  --gray-300: oklch(85% 0.01 145);
+  --gray-500: oklch(62% 0.012 145);
+  --gray-700: oklch(40% 0.015 145);
+  --ink: oklch(22% 0.02 145);
+  --ink-deep: oklch(15% 0.018 145);
+
+  /* --- semantic: light theme is the base definition --- */
+  --bg: var(--off-white);
+  --bg-raised: var(--white);
+  --bg-sunken: var(--gray-100);
+  --bg-canvas: oklch(88% 0.008 145);
+  --border: var(--gray-300);
+  --border-strong: var(--gray-500);
+  --text: var(--ink);
+  --text-muted: var(--gray-700);
+  --text-inverse: var(--off-white);
+  --brand: var(--emerald-500);
+  --brand-hover: var(--emerald-600);
+  --brand-soft: oklch(42% 0.08 145 / 0.12);
+  --focus: var(--emerald-400);
+  --selection: var(--amber);
+  --shadow: 0 1px 2px oklch(22% 0.02 145 / 0.08), 0 4px 12px oklch(22% 0.02 145 / 0.06);
+
+  /* --- type --- */
+  --font-display: 'Bebas Kai', 'Oswald', 'Arial Narrow', 'Segoe UI', sans-serif;
+  --font-body: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.75rem;
+
+  /* --- spacing & shape --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --radius-sm: 4px;
+  --radius: 7px;
+  --radius-lg: 12px;
+
+  --sidebar-width: 260px;
+  --rail-width: 68px;
+  --header-height: 48px;
+}
+
+/* Only the semantic layer is redefined per theme; the ramps never change. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: var(--ink-deep);
+    --bg-raised: var(--ink);
+    --bg-sunken: oklch(12% 0.015 145);
+    --bg-canvas: oklch(19% 0.015 145);
+    --border: oklch(32% 0.015 145);
+    --border-strong: oklch(45% 0.02 145);
+    --text: var(--off-white);
+    --text-muted: oklch(72% 0.012 145);
+    --text-inverse: var(--ink);
+    --brand: var(--emerald-300);
+    --brand-hover: var(--emerald-200);
+    --brand-soft: oklch(78% 0.08 145 / 0.16);
+    --focus: var(--emerald-300);
+    --shadow: 0 1px 2px oklch(0% 0 0 / 0.4), 0 8px 24px oklch(0% 0 0 / 0.3);
+  }
+}
+
+/* The explicit choice must win in both directions, so it is repeated here. */
+:root[data-theme='dark'] {
+  --bg: var(--ink-deep);
+  --bg-raised: var(--ink);
+  --bg-sunken: oklch(12% 0.015 145);
+  --bg-canvas: oklch(19% 0.015 145);
+  --border: oklch(32% 0.015 145);
+  --border-strong: oklch(45% 0.02 145);
+  --text: var(--off-white);
+  --text-muted: oklch(72% 0.012 145);
+  --text-inverse: var(--ink);
+  --brand: var(--emerald-300);
+  --brand-hover: var(--emerald-200);
+  --brand-soft: oklch(78% 0.08 145 / 0.16);
+  --focus: var(--emerald-300);
+  --shadow: 0 1px 2px oklch(0% 0 0 / 0.4), 0 8px 24px oklch(0% 0 0 / 0.3);
+}
