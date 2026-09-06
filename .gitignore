@@ -33,3 +33,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# --- bundled python runtime (built by frontend/scripts/prepare-python.mjs) ---
+frontend/runtime/*
+!frontend/runtime/README.txt

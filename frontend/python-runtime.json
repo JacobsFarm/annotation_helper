@@ -1,0 +1,14 @@
+{
+  "$comment": "The bundled Python runtime and the AI packages, in one place. CI reads this to build the shipped runtime; the app reads it again at run time so an in-app install uses exactly the same versions as a bundled one.",
+
+  "python": "3.12.10",
+  "uv": "latest",
+
+  "packages": ["ultralytics>=8.3", "pillow>=10.0"],
+
+  "$comment_indexes": "torch is resolved from one of these rather than PyPI. The wheels there carry a local version tag (2.9.1+cu130), which sorts above the plain PyPI 2.9.1, so the CUDA build wins without pinning a version that would rot. torchvision comes along the same way.",
+  "indexes": {
+    "cuda": "https://download.pytorch.org/whl/cu130",
+    "cpu": "https://download.pytorch.org/whl/cpu"
+  }
+}

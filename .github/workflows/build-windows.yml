@@ -1,0 +1,159 @@
+name: Build Windows
+
+# Every push to main builds the lite exe, so there is always a current download.
+# The CUDA variant is ~1.8 GB of wheels and takes the best part of an hour, so it is
+# built only for a release tag or when asked for by hand.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      cuda:
+        description: 'Also build the CUDA 13.0 variant'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Pick variants
+    runs-on: ubuntu-latest
+    outputs:
+      variants: ${{ steps.pick.outputs.variants }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          # lite     - bundled interpreter, no AI packages. Portable: ~120 MB, so a
+          #            single exe you download and double-click is the right shape.
+          # cuda130  - the same, plus ultralytics and a CUDA 13.0 torch. An installer,
+          #            because a portable exe unpacks itself into %TEMP% on every
+          #            launch and doing that with 4 GB is unusable.
+          lite='{"name":"lite","target":"portable","ai":"","suffix":"lite"}'
+          cuda='{"name":"cuda130","target":"nsis","ai":"cuda","suffix":"cuda130-setup"}'
+
+          if [ "${GITHUB_REF}" != "${GITHUB_REF#refs/tags/v}" ] || [ "${{ inputs.cuda }}" = "true" ]; then
+            echo "variants=[$lite,$cuda]" >> "$GITHUB_OUTPUT"
+          else
+            echo "variants=[$lite]" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: ${{ matrix.variant.name }}
+    needs: plan
+    runs-on: windows-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(needs.plan.outputs.variants) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      # An embeddable Python plus uv, so the app needs nothing from the target machine.
+      # With `--ai` it also downloads ultralytics and torch from the matching PyTorch
+      # index; without it, the app offers to do that on request.
+      - name: Prepare the bundled Python runtime
+        run: node scripts/prepare-python.mjs ${{ matrix.variant.ai && format('--ai {0}', matrix.variant.ai) || '' }}
+        working-directory: frontend
+
+      # Split out of `npm run dist` so a type error and a packaging failure show up as
+      # different red steps.
+      - name: Type-check and build
+        run: npm run build
+        working-directory: frontend
+
+      # `--publish never` keeps electron-builder from uploading on its own; the release
+      # steps below own that. The target and the file name come from the matrix, so both
+      # variants land next to each other with names that say what they are.
+      - name: Package
+        shell: bash
+        working-directory: frontend
+        run: |
+          npx electron-builder --win \
+            --config electron-builder.yml \
+            --publish never \
+            -c.win.target='${{ matrix.variant.target }}' \
+            -c.${{ matrix.variant.target }}.artifactName='AnnotationHelper-${version}-${{ matrix.variant.suffix }}.${ext}'
+
+      - name: Locate the exe
+        id: exe
+        shell: bash
+        working-directory: frontend
+        run: |
+          ls -la release
+          file=$(ls release/*.exe | head -1)
+          size=$(stat -c%s "$file")
+          echo "path=frontend/$file" >> "$GITHUB_OUTPUT"
+          echo "size=$size" >> "$GITHUB_OUTPUT"
+          echo "$file is $((size / 1024 / 1024)) MB"
+
+      # A release asset may not exceed 2 GiB. The CUDA build is close to that line and
+      # may cross it, so rather than failing the upload after an hour of work it is split
+      # into volumes that 7-Zip (or Windows' own tar) puts back together.
+      - name: Split if over GitHub's 2 GiB asset limit
+        id: assets
+        shell: bash
+        run: |
+          file='${{ steps.exe.outputs.path }}'
+          if [ '${{ steps.exe.outputs.size }}' -lt 2147483648 ]; then
+            echo "files=$file" >> "$GITHUB_OUTPUT"
+            echo "split=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Over the limit; splitting into 1900 MB volumes."
+            # Store, not deflate: the payload is already-compressed wheels, so this only
+            # has to split, and re-compressing 2 GB would cost minutes for nothing.
+            7z a -tzip -mx=0 -v1900m "$file.zip" "$file"
+            echo "files=$file.zip.*" >> "$GITHUB_OUTPUT"
+            echo "split=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: annotation-helper-${{ matrix.variant.name }}
+          path: ${{ steps.assets.outputs.files }}
+          if-no-files-found: error
+          retention-days: 30
+
+      # A rolling prerelease that always points at the newest main build, so there is a
+      # stable download link that needs no GitHub login. Deleted and recreated rather
+      # than updated, so the tag follows the commit the assets were built from. Only the
+      # lite variant is built on main, so no two jobs race for it.
+      - name: Update the rolling "latest" release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest ${{ steps.assets.outputs.files }} \
+            --prerelease \
+            --title "Latest build (main)" \
+            --notes "Automatic build of \`${GITHUB_SHA:0:7}\`. Download, double-click, annotate. Prediction and training need the AI packages: install them in the app under Settings → AI packages."
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: ${{ steps.assets.outputs.files }}

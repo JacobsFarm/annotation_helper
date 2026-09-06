@@ -7,7 +7,8 @@
    * everything else describes the data and goes into the project folder, so it travels
    * with it.
    */
-  import type { AppSettings } from '@shared/ipc'
+  import { onMount } from 'svelte'
+  import type { AppSettings, Compute } from '@shared/ipc'
   import type { AiSettings } from '@shared/project'
   import Button from '../lib/components/Button.svelte'
   import Field from '../lib/components/Field.svelte'
@@ -15,7 +16,16 @@
   import PathPicker from '../lib/components/PathPicker.svelte'
   import Section from '../lib/components/Section.svelte'
   import { LOCALES, t, type Locale } from '../lib/i18n/index.svelte'
-  import { pythonStatus, restartEngine } from '../lib/state/ai.svelte'
+  import {
+    cancelInstall,
+    installLog,
+    isInstalling,
+    packageStatus,
+    pythonStatus,
+    refreshPackages,
+    restartEngine,
+    startInstall
+  } from '../lib/state/ai.svelte'
   import {
     addClass,
     classes,
@@ -43,10 +53,25 @@
   ]
 
   let newClassName = $state('')
+  let compute = $state<Compute>('auto')
+  let logBox = $state<HTMLPreElement | null>(null)
 
   const open = $derived(project())
   const status = $derived(pythonStatus())
   const app = $derived(settings())
+  const packages = $derived(packageStatus())
+  const installing = $derived(isInstalling())
+  const log = $derived(installLog())
+
+  onMount(() => {
+    void refreshPackages()
+  })
+
+  // Follow the tail while uv talks. Reading `log` is what subscribes this effect.
+  $effect(() => {
+    const box = logBox
+    if (box && log.length) box.scrollTop = box.scrollHeight
+  })
 
   async function patchAi(patch: Partial<AiSettings>): Promise<void> {
     if (!open) return
@@ -272,6 +297,52 @@
     {/if}
   </Section>
 
+  <Section title={t('packages_title')}>
+    {#if packages?.bundled}
+      <p class="ok">{t('packages_bundled')}</p>
+    {:else if packages?.installed}
+      <p class="ok">{t('packages_installed')}</p>
+      <p class="mono muted path">{packages?.target}</p>
+    {:else if !packages?.runtimeBundled}
+      <!-- A build without the bundled interpreter has nothing to install into, so it
+           says so rather than offering a button that cannot work. -->
+      <p class="warn">{t('packages_no_runtime')}</p>
+    {:else}
+      <p class="muted">{t('packages_explainer')}</p>
+    {/if}
+
+    {#if packages && !packages.bundled && packages.runtimeBundled}
+      <div class="grid">
+        <Field label={t('packages_compute')} hint={t('packages_compute_hint')}>
+          <select
+            value={compute}
+            disabled={installing}
+            onchange={(event) => (compute = event.currentTarget.value as Compute)}
+          >
+            <option value="auto">
+              {t('packages_compute_auto', { suggested: t(`packages_compute_${packages.suggested}`) })}
+            </option>
+            <option value="cuda">{t('packages_compute_cuda')}</option>
+            <option value="cpu">{t('packages_compute_cpu')}</option>
+          </select>
+        </Field>
+      </div>
+
+      {#if installing}
+        <Button size="sm" icon="close" onclick={cancelInstall}>{t('common_cancel')}</Button>
+        <p class="muted">{t('packages_installing')}</p>
+      {:else}
+        <Button size="sm" icon="play" onclick={() => startInstall(compute)}>
+          {packages.installed ? t('packages_reinstall') : t('packages_install')}
+        </Button>
+      {/if}
+    {/if}
+
+    {#if log.length}
+      <pre class="log mono" bind:this={logBox}>{log.join('\n')}</pre>
+    {/if}
+  </Section>
+
   <Section title={t('settings_shortcuts')}>
     <ul class="shortcuts">
       {#each SHORTCUTS as item (item.keys)}
@@ -383,6 +454,22 @@
   .warn {
     color: var(--amber);
     margin: 0;
+  }
+
+  /* uv's own output, followed to the tail. Capped in height so a long install cannot
+     push the rest of the page out of reach. */
+  .log {
+    margin: var(--space-3) 0 0;
+    padding: var(--space-2);
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
   }
 
   .shortcuts {

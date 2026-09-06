@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { broadcast, registerIpc } from './ipc'
 import { handleProtocol, registerScheme } from './protocol'
+import { onPackageEvent } from './services/package-service'
 import { onSidecarEvent, probe, stop } from './services/python-service'
 import { createWindow } from './window'
 
@@ -24,6 +25,7 @@ if (!app.requestSingleInstanceLock()) {
     handleProtocol()
     registerIpc()
     relaySidecarEvents()
+    relayPackageEvents()
     createWindow()
 
     // Probe in the background: a missing interpreter must not delay the first frame.
@@ -73,6 +75,25 @@ function relaySidecarEvents(): void {
         break
       default:
         break // 'ready' and anything newer: nothing to relay yet
+    }
+  })
+}
+
+/**
+ * The package installer's output, on its way to the renderer.
+ *
+ * Here rather than in the service, for the same reason as above: the service stays free
+ * of an import from `ipc/`, and the renderer's event vocabulary is defined in one place.
+ * A finished install also re-broadcasts the engine status, because installing torch is
+ * exactly the thing that turns "prediction is off" into "prediction is on".
+ */
+function relayPackageEvents(): void {
+  onPackageEvent((event) => {
+    if ('done' in event) {
+      broadcast({ type: 'packages:done', ok: event.ok, detail: event.detail })
+      void probe().then((status) => broadcast({ type: 'python:status', status }))
+    } else {
+      broadcast({ type: 'packages:output', line: event.line })
     }
   })
 }

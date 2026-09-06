@@ -28,6 +28,10 @@ export const ERROR_CODES = {
   pathOutsideProject: 'path_outside_project',
   pythonUnavailable: 'python_unavailable',
   pythonFailed: 'python_failed',
+  packagesUnavailable: 'packages_unavailable',
+  packagesBundled: 'packages_bundled',
+  packagesBusy: 'packages_busy',
+  packagesFailed: 'packages_failed',
   cancelled: 'cancelled',
   internal: 'internal'
 } as const
@@ -108,6 +112,28 @@ export interface PythonStatus {
   }
 }
 
+/** Which torch build the AI packages should be, or already are. */
+export type Compute = 'auto' | 'cuda' | 'cpu'
+
+/**
+ * The state of the heavy AI packages (ultralytics, torch), which are the one thing the
+ * app cannot simply carry in every build: with CUDA they are larger than the rest of the
+ * application by an order of magnitude.
+ */
+export interface PackageStatus {
+  /** ultralytics imports in the engine, from wherever it lives. */
+  installed: boolean
+  /** This build shipped with them; nothing is downloaded and nothing can be removed. */
+  bundled: boolean
+  installing: boolean
+  /** What a fresh install would choose here, based on whether an NVIDIA GPU answers. */
+  suggested: Exclude<Compute, 'auto'>
+  /** The writable directory an in-app install writes to. Shown so it can be inspected. */
+  target: string
+  /** A bundled interpreter is present, so an install needs nothing from the machine. */
+  runtimeBundled: boolean
+}
+
 export interface PredictRequest {
   root: string
   /** Image path relative to the project's images directory. */
@@ -136,6 +162,8 @@ export interface TrainRun {
 
 export type AppEvent =
   | { type: 'python:status'; status: PythonStatus }
+  | { type: 'packages:output'; line: string }
+  | { type: 'packages:done'; ok: boolean; detail?: string }
   | { type: 'predict:progress'; requestId: string; stage: string; pct: number }
   | { type: 'train:output'; runId: string; line: string; epoch: number; epochs: number }
   | { type: 'train:done'; runId: string; exitCode: number }
@@ -195,6 +223,9 @@ export interface Api {
     predict(input: PredictRequest): Promise<PredictResult>
     cancel(): Promise<void>
     restart(): Promise<PythonStatus>
+    packages(): Promise<PackageStatus>
+    install(input: { compute: Compute }): Promise<PackageStatus>
+    cancelInstall(): Promise<void>
   }
   train: {
     command(input: { root: string; overrides?: Record<string, unknown> }): Promise<string[]>

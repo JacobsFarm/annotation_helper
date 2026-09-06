@@ -8,6 +8,9 @@ directories:
 files:
   - out/**
   - package.json
+  # Read back at run time so an in-app package install uses the same versions and
+  # indexes that CI built the bundled runtime from.
+  - python-runtime.json
 
 # The Python engine ships alongside the app rather than inside the asar, so
 # `python -m annotation_helper sidecar` can import it. `python-service.ts` points
@@ -19,15 +22,28 @@ extraResources:
       - '**/*.py'
   - from: ../backend/pyproject.toml
     to: backend/pyproject.toml
+  # The bundled interpreter, uv, and - in the CUDA build - ultralytics and torch.
+  # `scripts/prepare-python.mjs` fills this; an empty directory is a valid build that
+  # falls back to whatever Python the machine has.
+  - from: runtime
+    to: runtime
 
 win:
-  target: nsis
-  artifactName: ${productName}-${version}-setup.${ext}
+  # Two shapes of the same build: an installer for people who want the app in
+  # Programs, and a single portable .exe you download and double-click. CI overrides
+  # this per variant - see .github/workflows/build-windows.yml.
+  target:
+    - nsis
+    - portable
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   perMachine: false
+  artifactName: AnnotationHelper-${version}-setup.${ext}
+
+portable:
+  artifactName: AnnotationHelper-${version}-portable.${ext}
 
 linux:
   target: AppImage

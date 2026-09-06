@@ -213,6 +213,25 @@ const nl: Record<keyof typeof en, string> = {
   settings_autosave: 'Labels automatisch opslaan bij het doorgaan naar de volgende afbeelding',
   settings_shortcuts: 'Sneltoetsen',
 
+  // --- AI-pakketten (ultralytics, torch) ---
+  packages_title: 'AI-pakketten',
+  packages_explainer:
+    'Voorspellen en trainen hebben ultralytics en PyTorch nodig. Die zitten niet in deze build; ze hier installeren downloadt ongeveer 1,8 GB voor CUDA, of 250 MB voor alleen CPU.',
+  packages_bundled: 'Meegeleverd met deze build. Er hoeft niets gedownload te worden.',
+  packages_installed: 'Geïnstalleerd.',
+  packages_no_runtime:
+    'Deze build heeft geen meegeleverde interpreter, dus pakketten kunnen hier niet geïnstalleerd worden. Installeer ze zelf: pip install ultralytics',
+  packages_compute: 'Variant',
+  packages_compute_hint: 'CUDA vereist een NVIDIA-GPU met een actueel stuurprogramma.',
+  packages_compute_auto: 'Automatisch ({suggested})',
+  packages_compute_cuda: 'CUDA (NVIDIA-GPU)',
+  packages_compute_cpu: 'Alleen CPU',
+  packages_install: 'Installeren',
+  packages_reinstall: 'Opnieuw installeren',
+  packages_installing: 'Bezig met downloaden en installeren. Dit duurt even; de app blijft bruikbaar.',
+  packages_done: 'AI-pakketten geïnstalleerd.',
+  packages_failed: 'De installatie is mislukt.',
+
   // --- sneltoetsen ---
   shortcut_next: 'Volgende afbeelding',
   shortcut_previous: 'Vorige afbeelding',
@@ -238,7 +257,11 @@ const nl: Record<keyof typeof en, string> = {
   error_python_unavailable: 'Python is niet ingesteld. Stel de interpreter in bij Instellingen.',
   error_python_failed: 'De Python-engine meldde een fout.',
   error_missing_dependency:
-    'Er ontbreekt een Python-pakket. Installeer met: pip install -e backend[ai]',
+    'De AI-pakketten ontbreken. Installeer ze bij Instellingen → AI-pakketten.',
+  error_packages_unavailable: 'Deze build kan zelf geen pakketten installeren.',
+  error_packages_bundled: 'Deze build bevat de AI-pakketten al.',
+  error_packages_busy: 'Er loopt al een installatie.',
+  error_packages_failed: 'De AI-pakketten konden niet geïnstalleerd worden.',
   error_model_not_found: 'Geen modelbestand op dat pad.',
   error_model_load_failed: 'Het model kon niet geladen worden.',
   error_predict_failed: 'Voorspellen is mislukt.',

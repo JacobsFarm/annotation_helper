@@ -211,6 +211,25 @@ export default {
   settings_autosave: 'Save labels automatically when moving to the next image',
   settings_shortcuts: 'Shortcuts',
 
+  // --- AI packages (ultralytics, torch) ---
+  packages_title: 'AI packages',
+  packages_explainer:
+    'Prediction and training need ultralytics and PyTorch. They are not in this build; installing them here downloads about 1.8 GB for CUDA, or 250 MB for CPU only.',
+  packages_bundled: 'Shipped with this build. Nothing to download.',
+  packages_installed: 'Installed.',
+  packages_no_runtime:
+    'This build has no bundled interpreter, so packages cannot be installed from here. Install them yourself: pip install ultralytics',
+  packages_compute: 'Build',
+  packages_compute_hint: 'CUDA needs an NVIDIA GPU with a current driver.',
+  packages_compute_auto: 'Automatic ({suggested})',
+  packages_compute_cuda: 'CUDA (NVIDIA GPU)',
+  packages_compute_cpu: 'CPU only',
+  packages_install: 'Install',
+  packages_reinstall: 'Install again',
+  packages_installing: 'Downloading and installing. This takes a while; the app stays usable.',
+  packages_done: 'AI packages installed.',
+  packages_failed: 'The install failed.',
+
   // --- shortcuts (labels for the reference list) ---
   shortcut_next: 'Next image',
   shortcut_previous: 'Previous image',
@@ -235,7 +254,11 @@ export default {
   error_path_outside_project: 'That path is outside the project.',
   error_python_unavailable: 'Python is not configured. Set the interpreter in Settings.',
   error_python_failed: 'The Python engine reported an error.',
-  error_missing_dependency: 'A Python package is missing. Install with: pip install -e backend[ai]',
+  error_missing_dependency: 'The AI packages are missing. Install them under Settings → AI packages.',
+  error_packages_unavailable: 'This build cannot install packages by itself.',
+  error_packages_bundled: 'This build already ships the AI packages.',
+  error_packages_busy: 'An install is already running.',
+  error_packages_failed: 'The AI packages could not be installed.',
   error_model_not_found: 'No model file at that path.',
   error_model_load_failed: 'The model could not be loaded.',
   error_predict_failed: 'Prediction failed.',

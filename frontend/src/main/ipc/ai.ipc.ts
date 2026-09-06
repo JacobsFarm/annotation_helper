@@ -1,4 +1,5 @@
-import type { PredictRequest, PredictResult } from '@shared/ipc'
+import type { Compute, PredictRequest, PredictResult } from '@shared/ipc'
+import { cancelInstall, installPackages, packageStatus } from '../services/package-service'
 import { openProject } from '../services/project-service'
 import { imagePathFor } from '../services/label-service'
 import { call, cancel, peekNextId, probe, restart } from '../services/python-service'
@@ -32,3 +33,9 @@ handle('ai.predict', async (input: PredictRequest): Promise<PredictResult> => {
 handle('ai.cancel', async () => {
   if (inFlight) await cancel(inFlight)
 })
+
+handle('ai.packages', () => packageStatus())
+
+handle('ai.install', (input: { compute: Compute }) => installPackages(input.compute))
+
+handle('ai.cancelInstall', () => cancelInstall())

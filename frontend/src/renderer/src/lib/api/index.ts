@@ -12,10 +12,12 @@ import type {
   AppEvent,
   AppSettings,
   Bridge,
+  Compute,
   DatasetEntry,
   DatasetSummary,
   HealthReport,
   IpcResult,
+  PackageStatus,
   PredictRequest,
   PredictResult,
   PythonStatus,
@@ -83,7 +85,10 @@ export const api: Api = {
     status: () => call<PythonStatus>('ai.status'),
     predict: (input: PredictRequest) => call<PredictResult>('ai.predict', input),
     cancel: () => call<void>('ai.cancel'),
-    restart: () => call<PythonStatus>('ai.restart')
+    restart: () => call<PythonStatus>('ai.restart'),
+    packages: () => call<PackageStatus>('ai.packages'),
+    install: (input: { compute: Compute }) => call<PackageStatus>('ai.install', input),
+    cancelInstall: () => call<void>('ai.cancelInstall')
   },
   train: {
     command: (input) => call<string[]>('train.command', input),

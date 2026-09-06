@@ -6,10 +6,12 @@
  * is shown where the user can act on it.
  */
 
-import type { PythonStatus } from '@shared/ipc'
+import type { Compute, PackageStatus, PythonStatus } from '@shared/ipc'
 import { api, safeCall } from '../api'
+import { t } from '../i18n/index.svelte'
 import { addPredicted } from './annotations.svelte'
 import { project } from './project.svelte'
+import { pushToast } from './toast.svelte'
 
 let status = $state<PythonStatus>({ available: false, reason: 'not_started' })
 let running = $state(false)
@@ -74,4 +76,63 @@ export async function predictCurrent(file: string): Promise<void> {
 export async function cancelPredict(): Promise<void> {
   if (!running) return
   await safeCall(() => api.ai.cancel())
+}
+
+// --- the AI packages (ultralytics, torch) -----------------------------------
+//
+// Only the CUDA build ships them; every other build downloads them on request. The log
+// is uv's own output rather than a percentage, because a fabricated percentage over a
+// 1.8 GB download is a lie the user would eventually catch.
+
+const MAX_LOG_LINES = 400
+
+let packages = $state<PackageStatus | null>(null)
+let installing = $state(false)
+let log = $state<string[]>([])
+
+export function packageStatus(): PackageStatus | null {
+  return packages
+}
+
+export function isInstalling(): boolean {
+  return installing
+}
+
+export function installLog(): string[] {
+  return log
+}
+
+export async function refreshPackages(): Promise<void> {
+  const next = await safeCall(() => api.ai.packages())
+  if (next) {
+    packages = next
+    installing = next.installing
+  }
+}
+
+export function appendPackageLine(line: string): void {
+  log = [...log, line].slice(-MAX_LOG_LINES)
+}
+
+export function finishInstall(ok: boolean, detail?: string): void {
+  installing = false
+  if (detail) appendPackageLine(detail)
+  void refreshPackages()
+  pushToast(ok ? 'info' : 'error', ok ? t('packages_done') : t('packages_failed'), detail)
+}
+
+export async function startInstall(compute: Compute): Promise<void> {
+  if (installing) return
+  installing = true
+  log = []
+  const result = await safeCall(() => api.ai.install({ compute }))
+  // A failure has already surfaced as a toast; `packages:done` clears the flag either
+  // way, but clear it here too so a rejection before the event still ends the spinner.
+  installing = false
+  if (result) packages = result
+}
+
+export async function cancelInstall(): Promise<void> {
+  if (!installing) return
+  await safeCall(() => api.ai.cancelInstall())
 }

@@ -7,7 +7,12 @@
   import Icon, { type IconName } from './lib/components/Icon.svelte'
   import Toasts from './lib/components/Toasts.svelte'
   import { t, type MessageKey } from './lib/i18n/index.svelte'
-  import { setPredictProgress, setPythonStatus } from './lib/state/ai.svelte'
+  import {
+    appendPackageLine,
+    finishInstall,
+    setPredictProgress,
+    setPythonStatus
+  } from './lib/state/ai.svelte'
   import { activeView, goToView, type ViewId } from './lib/state/nav.svelte'
   import { isOpen, project } from './lib/state/project.svelte'
   import { loadSettings } from './lib/state/settings.svelte'
@@ -33,6 +38,12 @@
       switch (event.type) {
         case 'python:status':
           setPythonStatus(event.status)
+          break
+        case 'packages:output':
+          appendPackageLine(event.line)
+          break
+        case 'packages:done':
+          finishInstall(event.ok, event.detail)
           break
         case 'predict:progress':
           setPredictProgress(event.stage, event.pct)

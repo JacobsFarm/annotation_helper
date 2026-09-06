@@ -18,6 +18,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { ERROR_CODES, type PythonStatus } from '@shared/ipc'
 import { ServiceError } from './errors'
+import { bundledPython, packagePaths } from './runtime-paths'
 import { loadSettings } from './settings-service'
 
 const REQUEST_TIMEOUT_MS = 15 * 60 * 1000 // a training start can be slow to acknowledge
@@ -69,6 +70,10 @@ function backendRoot(): string {
  * *not* trusted: on Windows it is very often the Microsoft Store stub, which prints a
  * message and exits - which is why `launch` verifies each candidate actually answers
  * instead of assuming the first one spawned is the right one.
+ *
+ * The bundled interpreter sits above everything the machine offers but below an explicit
+ * choice: it is the one this build knows has the right packages, yet a user who typed a
+ * path into Settings meant it.
  */
 async function interpreters(): Promise<string[]> {
   const configured = (await loadSettings()).pythonPath.trim()
@@ -76,6 +81,7 @@ async function interpreters(): Promise<string[]> {
     configured,
     working ?? '',
     process.env.ANNOTATION_HELPER_PYTHON ?? '',
+    bundledPython() ?? '',
     'python',
     'python3',
     'C:\\ProgramData\\anaconda3\\python.exe',
@@ -123,7 +129,11 @@ function tryLaunch(executable: string): Promise<boolean> {
       proc = spawn(executable, ['-u', '-m', 'annotation_helper', 'sidecar'], {
         env: {
           ...process.env,
-          PYTHONPATH: [backendRoot(), process.env.PYTHONPATH].filter(Boolean).join(';'),
+          // The package directories come before the ambient PYTHONPATH so a bundled or
+          // user-installed torch beats whatever the machine happens to have.
+          PYTHONPATH: [backendRoot(), ...packagePaths(), process.env.PYTHONPATH]
+            .filter(Boolean)
+            .join(';'),
           PYTHONIOENCODING: 'utf-8',
           PYTHONUTF8: '1'
         },
