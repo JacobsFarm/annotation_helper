@@ -38,7 +38,7 @@
   import { settings, updateSettings } from '../lib/state/settings.svelte'
   import { pushToast } from '../lib/state/toast.svelte'
 
-  const SHORTCUTS: { keys: string; label: 'shortcut_next' | 'shortcut_previous' | 'shortcut_save' | 'shortcut_skip' | 'shortcut_delete' | 'shortcut_tool_select' | 'shortcut_tool_box' | 'shortcut_tool_polygon' | 'shortcut_fit' | 'shortcut_background' | 'shortcut_predict' | 'shortcut_undo' | 'shortcut_class' }[] = [
+  const SHORTCUTS: { keys: string; label: 'shortcut_next' | 'shortcut_previous' | 'shortcut_save' | 'shortcut_skip' | 'shortcut_delete' | 'shortcut_tool_select' | 'shortcut_tool_box' | 'shortcut_tool_polygon' | 'shortcut_tool_erase' | 'shortcut_eraser_size' | 'shortcut_fit' | 'shortcut_background' | 'shortcut_predict' | 'shortcut_undo' | 'shortcut_class' }[] = [
     { keys: '→ / PageDown', label: 'shortcut_next' },
     { keys: '← / PageUp', label: 'shortcut_previous' },
     { keys: 'Enter / Ctrl+S', label: 'shortcut_save' },
@@ -47,6 +47,8 @@
     { keys: 'V', label: 'shortcut_tool_select' },
     { keys: 'B', label: 'shortcut_tool_box' },
     { keys: 'P', label: 'shortcut_tool_polygon' },
+    { keys: 'G', label: 'shortcut_tool_erase' },
+    { keys: '[ / ]', label: 'shortcut_eraser_size' },
     { keys: 'F', label: 'shortcut_fit' },
     { keys: 'N', label: 'shortcut_background' },
     { keys: 'E', label: 'shortcut_predict' },
@@ -152,11 +154,11 @@
         </select>
       </Field>
     </div>
-    <Field label={t('settings_autosave')} inline>
+    <Field label={t('settings_auto_predict')} hint={t('settings_auto_predict_hint')} inline>
       <input
         type="checkbox"
-        checked={app.autosave}
-        onchange={(event) => updateSettings({ autosave: event.currentTarget.checked })}
+        checked={app.autoPredict}
+        onchange={(event) => updateSettings({ autoPredict: event.currentTarget.checked })}
       />
     </Field>
   </Section>

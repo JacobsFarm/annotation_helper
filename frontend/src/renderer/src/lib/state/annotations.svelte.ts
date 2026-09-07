@@ -23,6 +23,16 @@ let selected = $state<string[]>([])
 let dirty = $state(false)
 let saving = $state(false)
 
+/**
+ * Whether the *user* changed anything since this image was loaded.
+ *
+ * Apart from `dirty`, because a prediction dirties the annotation without anyone having
+ * decided anything: it is a suggestion until it is saved. Moving to the next image
+ * throws unsaved work away by design, so this is what decides whether there was any
+ * work to warn about.
+ */
+let touched = $state(false)
+
 let past: Shape[][] = []
 let future: Shape[][] = []
 
@@ -53,6 +63,10 @@ export function isDirty(): boolean {
   return dirty
 }
 
+export function hasManualEdits(): boolean {
+  return touched
+}
+
 export function isSaving(): boolean {
   return saving
 }
@@ -76,6 +90,7 @@ export async function loadAnnotation(root: string, file: string): Promise<void> 
   annotation = loaded
   selected = []
   dirty = false
+  touched = false
   past = []
   future = []
   generation += 1
@@ -85,6 +100,7 @@ export function clearAnnotation(): void {
   annotation = null
   selected = []
   dirty = false
+  touched = false
   past = []
   future = []
   generation += 1
@@ -97,7 +113,7 @@ export function clearAnnotation(): void {
  * bypassed by accident. `record: false` is for continuous drags, which push one history
  * entry at the start rather than one per pointer move.
  */
-function mutate(next: Shape[], record = true): void {
+function mutate(next: Shape[], record = true, by: 'user' | 'model' = 'user'): void {
   if (!annotation) return
   if (record) {
     past = [...past.slice(-HISTORY_LIMIT + 1), annotation.shapes]
@@ -105,6 +121,7 @@ function mutate(next: Shape[], record = true): void {
   }
   annotation = { ...annotation, shapes: next }
   dirty = true
+  if (by === 'user') touched = true
 }
 
 export function beginHistoryStep(): void {
@@ -158,7 +175,7 @@ export function addPredicted(predicted: Shape[]): void {
   const kept = predicted
     .filter((s) => !isDegenerate(s))
     .map((s) => clampShape(s, annotation!.width, annotation!.height))
-  mutate([...annotation.shapes, ...kept])
+  mutate([...annotation.shapes, ...kept], true, 'model')
   selected = []
 }
 
@@ -191,6 +208,7 @@ export function undo(): void {
   annotation = { ...annotation, shapes: previous }
   selected = []
   dirty = true
+  touched = true
 }
 
 export function redo(): void {
@@ -201,6 +219,7 @@ export function redo(): void {
   annotation = { ...annotation, shapes: next }
   selected = []
   dirty = true
+  touched = true
 }
 
 // --- saving -----------------------------------------------------------------
@@ -221,6 +240,7 @@ export async function saveAnnotation(root: string, quiet = false): Promise<boole
   if (!result) return false
 
   dirty = false
+  touched = false
   annotation = { ...annotation, imageFile: result.imageFile, reviewed: true }
   markEntry(was, annotation.shapes.length, {
     file: result.imageFile,

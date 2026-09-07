@@ -109,6 +109,7 @@ export default {
   annotate_pending: 'New',
   annotate_pending_hint: 'Waiting in the input folder. Saving moves it to images and labels.',
   annotate_unsaved: 'Unsaved changes',
+  annotate_left_unsaved: 'Left unsaved — Enter or Save keeps it',
   annotate_background_badge: 'Background',
   annotate_reviewed_badge: 'Labelled',
 
@@ -240,7 +241,9 @@ export default {
   settings_python_missing: 'Not available. Prediction, health check, split and training are off.',
   settings_python_cuda: 'GPU: {devices}',
   settings_python_cpu: 'No GPU detected; training will use the CPU.',
-  settings_autosave: 'Save labels automatically when moving to the next image',
+  settings_auto_predict: 'Predict automatically when an image loads',
+  settings_auto_predict_hint:
+    'Only for images without labels. A prediction is a suggestion: it is saved when you press Enter or Save, and dropped when you move on without doing either.',
   settings_shortcuts: 'Shortcuts',
 
   // --- AI packages (ultralytics, torch) ---
@@ -271,6 +274,8 @@ export default {
   shortcut_tool_select: 'Select tool',
   shortcut_tool_box: 'Box tool',
   shortcut_tool_polygon: 'Polygon tool',
+  shortcut_tool_erase: 'Eraser',
+  shortcut_eraser_size: 'Eraser size',
   shortcut_fit: 'Fit to window',
   shortcut_background: 'Mark as background',
   shortcut_predict: 'Predict',

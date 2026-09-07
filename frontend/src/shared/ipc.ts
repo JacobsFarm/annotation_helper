@@ -122,7 +122,6 @@ export interface AppSettings {
   theme: 'system' | 'light' | 'dark'
   /** Empty means "search PATH". Set explicitly when Python is not on PATH. */
   pythonPath: string
-  autosave: boolean
   /** Predict as soon as an unannotated image opens, so annotating is one review pass. */
   autoPredict: boolean
   recent: RecentProject[]

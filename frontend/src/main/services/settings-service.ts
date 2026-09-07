@@ -16,7 +16,6 @@ const DEFAULTS: AppSettings = {
   locale: 'nl',
   theme: 'system',
   pythonPath: '',
-  autosave: true,
   autoPredict: false,
   recent: []
 }

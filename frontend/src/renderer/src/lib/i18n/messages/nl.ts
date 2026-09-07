@@ -109,6 +109,7 @@ const nl: Record<keyof typeof en, string> = {
   annotate_pending: 'Nieuw',
   annotate_pending_hint: 'Wacht in de map input. Opslaan verplaatst de afbeelding naar images en labels.',
   annotate_unsaved: 'Niet-opgeslagen wijzigingen',
+  annotate_left_unsaved: 'Niet opgeslagen — met Enter of Opslaan bewaar je het',
   annotate_background_badge: 'Achtergrond',
   annotate_reviewed_badge: 'Gelabeld',
 
@@ -241,7 +242,9 @@ const nl: Record<keyof typeof en, string> = {
     'Niet beschikbaar. Voorspellen, controle, splitsen en trainen staan uit.',
   settings_python_cuda: 'GPU: {devices}',
   settings_python_cpu: 'Geen GPU gevonden; trainen gebruikt de CPU.',
-  settings_autosave: 'Labels automatisch opslaan bij het doorgaan naar de volgende afbeelding',
+  settings_auto_predict: 'Automatisch voorspellen zodra een afbeelding inlaadt',
+  settings_auto_predict_hint:
+    'Alleen bij afbeeldingen zonder labels. Een voorspelling is een voorstel: met Enter of Opslaan bewaar je hem, ga je door zonder dat te doen dan vervalt hij.',
   settings_shortcuts: 'Sneltoetsen',
 
   // --- AI-pakketten (ultralytics, torch) ---
@@ -272,6 +275,8 @@ const nl: Record<keyof typeof en, string> = {
   shortcut_tool_select: 'Selectiegereedschap',
   shortcut_tool_box: 'Boxgereedschap',
   shortcut_tool_polygon: 'Polygoongereedschap',
+  shortcut_tool_erase: 'Gum',
+  shortcut_eraser_size: 'Grootte van de gum',
   shortcut_fit: 'Passend maken',
   shortcut_background: 'Markeren als achtergrond',
   shortcut_predict: 'Voorspellen',

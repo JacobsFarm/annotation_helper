@@ -1,5 +1,5 @@
 /**
- * Application settings: language, theme, interpreter, autosave.
+ * Application settings: language, theme, interpreter, automatic prediction.
  *
  * These live in `userData`, not in the project, because they describe this machine and
  * this user rather than the data.
@@ -13,7 +13,6 @@ const FALLBACK: AppSettings = {
   locale: 'nl',
   theme: 'system',
   pythonPath: '',
-  autosave: true,
   autoPredict: false,
   recent: []
 }

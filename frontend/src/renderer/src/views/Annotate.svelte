@@ -17,6 +17,7 @@
     canUndo,
     clearAnnotation,
     current,
+    hasManualEdits,
     isDirty,
     isSaving,
     loadAnnotation,
@@ -137,10 +138,19 @@
     void predictCurrent(file)
   })
 
-  async function navigate(delta: number): Promise<void> {
-    if (isDirty() && settings().autosave && projectRoot) {
-      await saveAnnotation(projectRoot, true)
-    }
+  /**
+   * Move to another image. Deliberately writes nothing.
+   *
+   * A label file is only written by Enter, Ctrl+S or the Save button, so flipping through
+   * with the arrow keys can never turn a prediction into a finished annotation behind
+   * your back - which is the whole point of predicting on load: you look, and you accept
+   * what is worth accepting.
+   *
+   * Work you did by hand is a different matter, so leaving that behind says so out loud.
+   * A prediction you never touched is not work, and stays quiet.
+   */
+  function navigate(delta: number): void {
+    if (hasManualEdits()) pushToast('info', t('annotate_left_unsaved'), entry?.file)
     step(delta)
   }
 
@@ -229,11 +239,11 @@
     switch (event.key) {
       case 'ArrowRight':
       case 'PageDown':
-        void navigate(1)
+        navigate(1)
         break
       case 'ArrowLeft':
       case 'PageUp':
-        void navigate(-1)
+        navigate(-1)
         break
       case 'Enter':
         void save()
