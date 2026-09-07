@@ -68,6 +68,39 @@ expressible. In memory it is carried by `ImageAnnotation.reviewed`:
 | `true` | 0 | verified background |
 | `true` | n | annotated |
 
+## Annotation kinds
+
+Which rows a file holds decides which task the image can train, and the two directions
+are not equal:
+
+| Kind | Rows | Trains detection | Trains segmentation |
+|---|---|---|---|
+| `box` | boxes only | yes | **no** |
+| `polygon` | polygons only | yes, via their bounding boxes | yes |
+| `mixed` | both | yes | **no — and it corrupts the run** |
+| `background` | none, file exists | yes | yes |
+| `none` | no file | not part of the dataset | not part of the dataset |
+
+A polygon flattens to its own bounding box for free. A box cannot become the mask it
+never held, so the conversion only ever runs one way.
+
+`mixed` is the one that has to be avoided rather than merely noted. Ultralytics decides
+per *file*: if any row has more than six values it reads every row in that file as a
+polygon, so a five-token box row is reshaped into a two-point polygon and comes out as a
+nonsense box. Nothing raises; the run is simply worse. The health check reports
+`mixed_shape_kinds` — a warning in a detection project, an error in a segmentation one —
+and `box_only_image` when a segmentation project holds an image that can never train a
+mask.
+
+The kind is derived, never stored: it is a function of the rows plus whether the file
+exists. `annotation_kind()` in Python and `annotationKind()` in TypeScript compute it,
+and both are covered by the same test cases.
+
+Conversion happens on export and never in `labels/`. `split --shapes detect` writes each
+polygon out as its bounding box into the split's own label files; `--shapes segment`
+leaves out every image without a mask. The annotation on disk stays the richest form of
+the work.
+
 ## Reading is forgiving, writing is strict
 
 A malformed row never raises. It produces an issue and is skipped, so one bad line
@@ -100,6 +133,8 @@ Both implementations are tested for these:
    suites guard against that regression by name.)
 4. Boxes and polygons survive in the same file, in order.
 5. An empty shape list writes an empty file, not a missing one.
+6. Flattening polygons to boxes changes nothing already written as a box, and running it
+   twice changes nothing at all.
 
 ## Class ids
 

@@ -12,6 +12,7 @@
   import PathPicker from '../lib/components/PathPicker.svelte'
   import { t } from '../lib/i18n/index.svelte'
   import { pythonStatus } from '../lib/state/ai.svelte'
+  import { datasetSummary } from '../lib/state/dataset.svelte'
   import { patchProject, project } from '../lib/state/project.svelte'
   import { pushToast } from '../lib/state/toast.svelte'
   import {
@@ -28,6 +29,13 @@
 
   const open = $derived(project())
   const ready = $derived(pythonStatus().capabilities?.train === true)
+  /**
+   * A segmentation run cannot learn from a box, and a file holding both kinds is worse
+   * than useless to it. Better said here, before an hour of training, than inferred
+   * afterwards from a disappointing mAP.
+   */
+  const segmenting = $derived(open?.task === 'segment' || open?.task === 'both')
+  const gap = $derived(datasetSummary())
   const command = $derived(trainCommand().join(' '))
   const progress = $derived(
     trainEpochs() > 0 ? Math.round((trainEpoch() / trainEpochs()) * 100) : 0
@@ -62,6 +70,12 @@
 
   {#if !ready}
     <p class="warn">{t('settings_python_missing')}</p>
+  {/if}
+
+  {#if segmenting && gap.boxImages + gap.mixedImages > 0}
+    <p class="warn">
+      {t('train_segment_gap', { boxes: gap.boxImages, mixed: gap.mixedImages })}
+    </p>
   {/if}
 
   <Section title={t('train_settings')}>

@@ -6,7 +6,7 @@
    * sidecar - the same code path the CLI uses, so the GUI and a terminal can never
    * disagree about what a split contains.
    */
-  import type { HealthReport, SplitResult } from '@shared/ipc'
+  import type { HealthReport, ShapeSelection, SplitResult } from '@shared/ipc'
   import { api, safeCall } from '../lib/api'
   import Button from '../lib/components/Button.svelte'
   import Field from '../lib/components/Field.svelte'
@@ -22,6 +22,12 @@
   let busy = $state(false)
   let mode = $state<'copy' | 'move' | 'lists'>('copy')
   let includeUnlabelled = $state(false)
+  /**
+   * Which half of the work this dataset is for. `detect` rewrites label files on the way
+   * out, which `lists` mode never copies, so the two exclude each other in the form
+   * rather than in an error afterwards.
+   */
+  let shapes = $state<ShapeSelection>('any')
 
   const open = $derived(project())
   const summary = $derived(datasetSummary())
@@ -38,7 +44,7 @@
     if (!open) return
     busy = true
     splitResult = await safeCall(() =>
-      api.dataset.split({ root: open.root, mode, includeUnlabelled })
+      api.dataset.split({ root: open.root, mode, includeUnlabelled, shapes })
     )
     busy = false
     if (splitResult) await loadDataset(open.root)
@@ -105,6 +111,22 @@
       </div>
       <div class="stat"><strong>{summary.shapes}</strong><span>{t('dataset_shapes')}</span></div>
     </div>
+
+    <h4>{t('dataset_kinds')}</h4>
+    <div class="stats kinds">
+      <div class="stat box">
+        <strong>{summary.boxImages}</strong><span>{t('dataset_kind_box')}</span>
+      </div>
+      <div class="stat polygon">
+        <strong>{summary.polygonImages}</strong><span>{t('dataset_kind_polygon')}</span>
+      </div>
+      {#if summary.mixedImages > 0}
+        <div class="stat mixed">
+          <strong>{summary.mixedImages}</strong><span>{t('dataset_kind_mixed')}</span>
+        </div>
+      {/if}
+    </div>
+    <p class="muted note">{t('dataset_kind_hint')}</p>
   </Section>
 
   <Section title={t('dataset_health')}>
@@ -123,6 +145,10 @@
         {report.issues.length === 0
           ? t('dataset_health_clean')
           : t('dataset_health_summary', { errors, warnings })}
+      </p>
+
+      <p class="muted note">
+        {t('dataset_health_kinds', { boxes: report.boxes, polygons: report.polygons })}
       </p>
 
       {#if Object.keys(report.perClass).length > 0}
@@ -166,11 +192,22 @@
     {/snippet}
 
     <div class="grid">
+      <Field label={t('dataset_split_shapes')} hint={t('dataset_split_shapes_hint')}>
+        <select bind:value={shapes}>
+          <option value="any">{t('dataset_split_shapes_any')}</option>
+          <option value="segment">{t('dataset_split_shapes_segment')}</option>
+          <option value="detect" disabled={mode === 'lists'}>
+            {t('dataset_split_shapes_detect')}
+          </option>
+        </select>
+      </Field>
       <Field label={t('dataset_split_mode')} hint={t('dataset_split_mode_hint')}>
         <select bind:value={mode}>
           <option value="copy">{t('dataset_split_mode_copy')}</option>
           <option value="move">{t('dataset_split_mode_move')}</option>
-          <option value="lists">{t('dataset_split_mode_lists')}</option>
+          <option value="lists" disabled={shapes === 'detect'}>
+            {t('dataset_split_mode_lists')}
+          </option>
         </select>
       </Field>
       <Field label={t('dataset_split_seed')} hint={t('dataset_split_seed_hint')}>
@@ -224,6 +261,12 @@
           skipped: splitResult.skipped
         })}
       </p>
+      {#if splitResult.skippedKind > 0}
+        <p class="note">{t('dataset_split_left_out', { count: splitResult.skippedKind })}</p>
+      {/if}
+      {#if splitResult.converted > 0}
+        <p class="note">{t('dataset_split_flattened', { count: splitResult.converted })}</p>
+      {/if}
       <p class="mono muted">{splitResult.output}</p>
     {/if}
   </Section>
@@ -266,6 +309,25 @@
   .stat span {
     font-size: var(--text-xs);
     color: var(--text-muted);
+  }
+
+  /* The two halves of the work, told apart by colour and by their own labels: what
+     trains a mask, and what can only ever train a box. */
+  .kinds .stat.box strong {
+    color: var(--brand);
+  }
+
+  .kinds .stat.polygon strong {
+    color: var(--teal);
+  }
+
+  .kinds .stat.mixed strong {
+    color: var(--amber-strong);
+  }
+
+  .note {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
   }
 
   .grid {

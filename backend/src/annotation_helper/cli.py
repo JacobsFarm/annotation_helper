@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         return args.handler(args)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
@@ -73,6 +73,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_split.add_argument("--output", type=Path)
     p_split.add_argument("--mode", choices=["copy", "move", "lists"], default="copy")
     p_split.add_argument("--include-unlabelled", action="store_true")
+    p_split.add_argument(
+        "--shapes",
+        choices=["any", "segment", "detect"],
+        default="any",
+        help="any: as annotated; segment: polygon-only images; detect: polygons as boxes",
+    )
     p_split.add_argument("--train", type=float, help="override the train ratio")
     p_split.add_argument("--val", type=float)
     p_split.add_argument("--test", type=float)
@@ -166,9 +172,12 @@ def _cmd_check(args) -> int:
         print(f"images      {report.images}")
         print(f"labelled    {report.labelled}  (of which {report.backgrounds} background)")
         print(f"unlabelled  {report.unlabelled}")
-        print(f"shapes      {report.shapes}")
+        print(f"shapes      {report.shapes}  ({report.boxes} box, {report.polygons} polygon)")
         for class_id, count in sorted(report.per_class.items()):
             print(f"  {class_id:>3} {project.class_name(class_id):<20} {count}")
+        if report.per_kind:
+            kinds = "  ".join(f"{k} {v}" for k, v in sorted(report.per_kind.items()))
+            print(f"per kind    {kinds}")
         if report.issues:
             print(f"\n{len(report.issues)} issue(s):")
             for issue in report.issues[:50]:
@@ -195,8 +204,13 @@ def _cmd_split(args) -> int:
         output=args.output,
         mode=args.mode,
         include_unlabelled=args.include_unlabelled,
+        shapes=args.shapes,
     )
     print(f"train {result.train}  val {result.val}  test {result.test}  skipped {result.skipped}")
+    if result.skipped_kind:
+        print(f"left out    {result.skipped_kind} (no mask to learn from)")
+    if result.converted:
+        print(f"flattened   {result.converted} label file(s) to boxes")
     print(f"output: {result.output}")
     print(f"data.yaml: {project.root / 'data.yaml'}")
     return 0

@@ -7,7 +7,7 @@
  * rejects**; the preload unwraps it and throws a clean `ApiError` the renderer can show.
  */
 
-import type { ImageAnnotation, Shape } from './shapes'
+import type { AnnotationKind, ImageAnnotation, Shape } from './shapes'
 import type { AiSettings, Project, ProjectFile } from './project'
 
 export type IpcFailure = { code: string; message: string; detail?: string }
@@ -50,6 +50,11 @@ export interface DatasetEntry {
   /** A label file exists. It may be empty, which means verified background. */
   labelled: boolean
   shapeCount: number
+  /** Of `shapeCount`. The two kinds are counted apart because they train apart. */
+  boxCount: number
+  polygonCount: number
+  /** Which task this image can train. Derived from the two counts and `labelled`. */
+  kind: AnnotationKind
   /** `ah-img://` URL the renderer can put straight into an `<img>`. */
   url: string
 }
@@ -61,6 +66,10 @@ export interface DatasetSummary {
   labelled: number
   backgrounds: number
   shapes: number
+  /** Labelled images by annotation kind. Backgrounds count in none of the three. */
+  boxImages: number
+  polygonImages: number
+  mixedImages: number
 }
 
 /** What is sitting in the project's recycle bin right now. */
@@ -99,15 +108,31 @@ export interface HealthReport {
   unlabelled: number
   backgrounds: number
   shapes: number
+  boxes: number
+  polygons: number
   perClass: Record<string, number>
+  /** Labelled images per `AnnotationKind`. */
+  perKind: Partial<Record<AnnotationKind, number>>
   issues: DatasetIssue[]
 }
+
+/**
+ * Which half of the work a split is for.
+ *
+ * `detect` is the direction that costs nothing; there is no `segment` counterpart,
+ * because a box cannot be turned back into the mask it never held.
+ */
+export type ShapeSelection = 'any' | 'segment' | 'detect'
 
 export interface SplitResult {
   train: number
   val: number
   test: number
   skipped: number
+  /** Labelled images left out because their shapes cannot train the chosen task. */
+  skippedKind: number
+  /** Images whose polygons were written out as boxes. */
+  converted: number
   output: string
 }
 
@@ -262,6 +287,7 @@ export interface Api {
       root: string
       mode: 'copy' | 'move' | 'lists'
       includeUnlabelled: boolean
+      shapes?: ShapeSelection
       output?: string
     }): Promise<SplitResult>
     exportConfig(root: string): Promise<{ dataYaml: string; classesTxt: string }>

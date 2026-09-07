@@ -12,11 +12,18 @@ handle('dataset.check', (root: string) => call<HealthReport>('dataset.check', { 
 
 handle(
   'dataset.split',
-  (input: { root: string; mode: string; includeUnlabelled: boolean; output?: string }) =>
+  (input: {
+    root: string
+    mode: string
+    includeUnlabelled: boolean
+    shapes?: string
+    output?: string
+  }) =>
     call<SplitResult>('dataset.split', {
       project: input.root,
       mode: input.mode,
       includeUnlabelled: input.includeUnlabelled,
+      shapes: input.shapes ?? 'any',
       output: input.output
     })
 )

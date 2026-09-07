@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .geometry import clamp
-from .shapes import Box, ImageAnnotation, Polygon, Shape, ShapeSource
+from .shapes import Box, ImageAnnotation, Polygon, Shape, ShapeSource, to_boxes
 
 PRECISION = 6
 """Decimals written per coordinate. 6 is ~0.004 px of error on an 8K image."""
@@ -149,6 +149,16 @@ def format_label_text(shapes: list[Shape], width: int, height: int) -> str:
         lines.append(f"{shape.class_id} {body}")
 
     return "\n".join(lines) + ("\n" if lines else "")
+
+
+def boxes_only_text(text: str) -> str:
+    """Rewrite a label file with every polygon replaced by its bounding box.
+
+    Used when exporting a detection dataset out of segmentation work. Parsing at
+    `1 x 1` makes pixel space and normalised space the same thing, so the conversion
+    needs no image header and reuses the one parser rather than growing a second.
+    """
+    return format_label_text(to_boxes(parse_label_text(text, 1, 1).shapes), 1, 1)
 
 
 def read_labels(

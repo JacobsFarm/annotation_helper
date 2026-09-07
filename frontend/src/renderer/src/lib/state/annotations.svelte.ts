@@ -10,7 +10,7 @@
  */
 
 import type { ImageAnnotation, Shape } from '@shared/shapes'
-import { clampShape, isDegenerate } from '@shared/shapes'
+import { clampShape, countShapeKinds, isDegenerate } from '@shared/shapes'
 import { api, safeCall } from '../api'
 import { t } from '../i18n/index.svelte'
 import { markEntry } from './dataset.svelte'
@@ -242,7 +242,7 @@ export async function saveAnnotation(root: string, quiet = false): Promise<boole
   dirty = false
   touched = false
   annotation = { ...annotation, imageFile: result.imageFile, reviewed: true }
-  markEntry(was, annotation.shapes.length, {
+  markEntry(was, countShapeKinds(annotation.shapes), {
     file: result.imageFile,
     area: result.area,
     url: result.url

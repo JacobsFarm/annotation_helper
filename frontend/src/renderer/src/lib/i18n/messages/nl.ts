@@ -140,6 +140,16 @@ const nl: Record<keyof typeof en, string> = {
     'Klik op het object om het te selecteren. Rechtsklik (of Alt+klik) op wat er niet bij hoort, Backspace haalt een klik terug. Enter neemt het masker over, Esc gooit het weg.',
 
   // --- dataset ---
+  annotate_filter_boxes: 'Box',
+  annotate_filter_polygons: 'Seg',
+  annotate_kind_box: 'Box',
+  annotate_kind_polygon: 'Seg',
+  annotate_kind_mixed: 'Beide',
+  annotate_kind_box_hint: 'Alleen boxen. Traint detectie, nooit segmentatie.',
+  annotate_kind_polygon_hint: 'Polygonen. Traint segmentatie, en detectie via hun boxen.',
+  annotate_kind_mixed_hint:
+    'Boxen en polygonen in één bestand. Bruikbaar voor detectie; breekt segmentatietraining.',
+
   dataset_title: 'Dataset',
   dataset_summary: 'Overzicht',
   dataset_images: 'Afbeeldingen',
@@ -153,6 +163,13 @@ const nl: Record<keyof typeof en, string> = {
   dataset_backgrounds: 'Achtergrondbeelden',
   dataset_shapes: 'Vormen',
   dataset_per_class: 'Per klasse',
+  dataset_kinds: 'Soorten annotatie',
+  dataset_kind_box: 'Alleen boxen',
+  dataset_kind_polygon: 'Polygonen',
+  dataset_kind_mixed: 'Beide soorten',
+  dataset_kind_hint:
+    'Een polygoon wordt gratis zijn eigen box, dus die traint beide taken. Een box wordt nooit een masker, dus een afbeelding met alleen boxen traint alleen detectie. Een afbeelding met allebei breekt segmentatietraining.',
+  dataset_health_kinds: '{boxes} boxen, {polygons} polygonen',
   dataset_health: 'Controle',
   dataset_health_run: 'Controle uitvoeren',
   dataset_health_clean: 'Geen problemen gevonden.',
@@ -171,6 +188,14 @@ const nl: Record<keyof typeof en, string> = {
   dataset_split_seed: 'Seed',
   dataset_split_seed_hint: 'Zelfde seed, zelfde dataset, zelfde verdeling.',
   dataset_split_include: 'Niet-gelabelde afbeeldingen meenemen',
+  dataset_split_shapes: 'Annotaties',
+  dataset_split_shapes_hint:
+    'Segmentatie laat weg wat geen masker heeft. Detectie schrijft elke polygoon weg als zijn omhullende box, en raakt je labelbestanden nooit aan.',
+  dataset_split_shapes_any: 'Zoals geannoteerd',
+  dataset_split_shapes_segment: 'Alleen segmentatie',
+  dataset_split_shapes_detect: 'Detectie: polygonen als boxen',
+  dataset_split_left_out: '{count} afbeelding(en) weggelaten: geen masker om van te leren',
+  dataset_split_flattened: '{count} labelbestand(en) weggeschreven als boxen',
   dataset_split_done: 'train {train}, val {val}, test {test} ({skipped} overgeslagen)',
   dataset_export: 'data.yaml en classes.txt schrijven',
   dataset_export_done: 'Configuratiebestanden geschreven.',
@@ -198,6 +223,8 @@ const nl: Record<keyof typeof en, string> = {
   train_log: 'Uitvoer',
   train_log_empty: 'Nog geen run gestart.',
   train_needs_split: 'Maak eerst een split: training leest data.yaml.',
+  train_segment_gap:
+    'Dit project segmenteert, maar {boxes} afbeelding(en) hebben alleen boxen en {mixed} hebben beide soorten. Splits met "Alleen segmentatie" op het Dataset-scherm, anders trainen die afbeeldingen niets bruikbaars.',
   train_finished: 'Klaar met exitcode {code}',
 
   // --- instellingen ---
@@ -321,6 +348,8 @@ const nl: Record<keyof typeof en, string> = {
 
   // --- datasetproblemen ---
   issue_missing_label: 'Geen labelbestand',
+  issue_mixed_shape_kinds: 'Boxen en polygonen in één bestand',
+  issue_box_only_image: 'Alleen boxen, dus geen masker om van te leren',
   issue_orphan_label: 'Label zonder afbeelding',
   issue_unreadable_image: 'Afbeelding kon niet gelezen worden',
   issue_unknown_class_id: 'Klasse-id niet in dit project',

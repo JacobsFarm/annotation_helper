@@ -217,6 +217,7 @@ def _split(server: Server, request: Request) -> dict[str, Any]:
         output=Path(request.params["output"]) if request.params.get("output") else None,
         mode=request.params.get("mode", "copy"),
         include_unlabelled=bool(request.params.get("includeUnlabelled", False)),
+        shapes=request.params.get("shapes", "any"),
     )
     return result.to_dict()
 

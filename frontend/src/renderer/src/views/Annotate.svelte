@@ -78,11 +78,32 @@
   import { commit as acceptSmart } from '../lib/canvas/tools/smart'
   import { actualSize, fit, viewport, zoomStep } from '../lib/state/viewport.svelte'
 
-  const FILTERS: DatasetFilter[] = ['all', 'todo', 'done']
+  const FILTERS: DatasetFilter[] = ['all', 'todo', 'done', 'boxes', 'polygons']
   const FILTER_LABELS = {
     all: 'annotate_filter_all',
     todo: 'annotate_filter_todo',
-    done: 'annotate_filter_done'
+    done: 'annotate_filter_done',
+    boxes: 'annotate_filter_boxes',
+    polygons: 'annotate_filter_polygons'
+  } as const
+
+  /**
+   * The two halves of the work, marked per image.
+   *
+   * Not decoration: a box-only image cannot train segmentation, and a file holding both
+   * kinds breaks it outright, so which one an image is has to be visible before the
+   * dataset screen says so about five hundred of them at once.
+   */
+  const KIND_LABELS = {
+    box: 'annotate_kind_box',
+    polygon: 'annotate_kind_polygon',
+    mixed: 'annotate_kind_mixed'
+  } as const
+
+  const KIND_HINTS = {
+    box: 'annotate_kind_box_hint',
+    polygon: 'annotate_kind_polygon_hint',
+    mixed: 'annotate_kind_mixed_hint'
   } as const
 
   const TOOL_BUTTONS: {
@@ -368,6 +389,11 @@
             <span class="filename">{item.file}</span>
             {#if item.area === 'input'}
               <span class="badge" title={t('annotate_pending_hint')}>{t('annotate_pending')}</span>
+            {/if}
+            {#if item.kind === 'box' || item.kind === 'polygon' || item.kind === 'mixed'}
+              <span class="kind-tag {item.kind}" title={t(KIND_HINTS[item.kind])}>
+                {t(KIND_LABELS[item.kind])}
+              </span>
             {/if}
             <span class="count muted">{item.shapeCount}</span>
           </button>
@@ -692,6 +718,7 @@
 
   .filters {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-1);
     padding: var(--space-2) var(--space-3) 0;
   }
@@ -823,6 +850,30 @@
     border-radius: 999px;
     background: var(--brand-soft);
     color: var(--brand);
+  }
+
+  /* Box and polygon are told apart by colour *and* by word: colour alone would leave
+     the distinction invisible to anyone who cannot see the difference between them. */
+  .kind-tag {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 5px;
+    border-radius: 999px;
+    border: 1px solid currentcolor;
+    flex: none;
+  }
+
+  .kind-tag.box {
+    color: var(--brand);
+  }
+
+  .kind-tag.polygon {
+    color: var(--teal);
+  }
+
+  .kind-tag.mixed {
+    color: var(--amber-strong);
   }
 
   .row-delete {

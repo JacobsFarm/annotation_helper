@@ -16,7 +16,7 @@
 | Files | Journalled trash and undo; nothing is hard-deleted |
 | i18n | English and Dutch, switchable without a reload |
 | Themes | Light and dark, or follow the system |
-| Tests | 54 pytest, 23 vitest, 16 end-to-end checks against the running app |
+| Tests | 70 pytest, 30 vitest, 16 end-to-end checks against the running app |
 
 ## Next, roughly in order of value
 

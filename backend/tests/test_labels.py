@@ -9,12 +9,20 @@ from __future__ import annotations
 import pytest
 
 from annotation_helper.labels import (
+    boxes_only_text,
     format_label_text,
     parse_label_text,
     read_labels,
     write_labels,
 )
-from annotation_helper.shapes import Box, ImageAnnotation, Polygon, shape_from_dict
+from annotation_helper.shapes import (
+    Box,
+    ImageAnnotation,
+    Polygon,
+    annotation_kind,
+    shape_from_dict,
+    trains_segmentation,
+)
 
 W, H = 1920, 1080
 TOLERANCE = 0.01  # one 6-decimal step is ~0.002 px at this width
@@ -160,3 +168,45 @@ def test_shape_dict_roundtrip():
 def test_shape_source_survives_the_wire():
     restored = shape_from_dict(Box(0, 0.0, 0.0, 1.0, 1.0, source="ai").to_dict())
     assert restored.source == "ai"
+
+
+# --- annotation kinds -------------------------------------------------------
+#
+# A polygon flattens to its bounding box for free; a box cannot become the mask it never
+# held. Everything the app does with the two kinds rests on that asymmetry.
+
+
+def test_annotation_kind_names_what_an_image_can_train():
+    box = Box(0, 10, 10, 50, 50)
+    polygon = Polygon(0, [(0, 0), (10, 0), (10, 10)])
+
+    assert annotation_kind([box]) == "box"
+    assert annotation_kind([polygon]) == "polygon"
+    assert annotation_kind([box, polygon]) == "mixed"
+    assert annotation_kind([]) == "background"
+    assert annotation_kind([], labelled=False) == "none"
+
+
+def test_only_polygons_and_backgrounds_train_segmentation():
+    assert trains_segmentation("polygon")
+    assert trains_segmentation("background")  # an empty label is a negative for either task
+    assert not trains_segmentation("box")
+    assert not trains_segmentation("mixed")
+
+
+def test_boxes_only_text_flattens_polygons_and_leaves_boxes_alone():
+    text = "0 0.100000 0.200000 0.300000 0.400000\n1 0.10 0.20 0.50 0.20 0.50 0.60\n"
+    converted = boxes_only_text(text)
+    rows = [line.split() for line in converted.splitlines()]
+
+    assert [len(r) for r in rows] == [5, 5]  # every row is now a detection row
+    assert rows[0] == text.splitlines()[0].split()  # the box is untouched
+    assert rows[1][0] == "1"  # and the polygon keeps its class
+    cx, cy, w, h = (float(v) for v in rows[1][1:])
+    assert (cx, cy, w, h) == pytest.approx((0.30, 0.40, 0.40, 0.40), abs=1e-6)
+
+
+def test_boxes_only_text_is_idempotent():
+    text = "0 0.10 0.20 0.50 0.20 0.50 0.60\n"
+    once = boxes_only_text(text)
+    assert boxes_only_text(once) == once

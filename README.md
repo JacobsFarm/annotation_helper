@@ -41,6 +41,22 @@ Other keys: `→`/`←` next and previous image, `Space` moves the image to the 
 `F` fits, `E` predicts, `1`–`9` pick a class and re-class the selection, `Ctrl+Z` undoes.
 Settings lists them all.
 
+### Boxes and masks, kept apart
+
+A polygon flattens to its own bounding box for free; a box cannot become the mask it
+never held. So the two halves of the work are not interchangeable, and the app keeps
+them visibly apart: every image in the list is marked **Box**, **Seg** or **Both**, the
+filters above it show one half at a time, and the Dataset screen counts them separately.
+
+That matters at the split. **Annotations → Segmentation only** leaves out every image
+without a mask, so a box-only image cannot quietly weaken a segmentation run.
+**Detection: polygons as boxes** goes the other way and writes every polygon out as its
+bounding box. Both act on the exported dataset; your label files are never rewritten.
+
+Boxes and polygons in *one* file are the case to avoid: ultralytics decides per file, so
+one box row among polygons is read as a two-point polygon and becomes a nonsense box
+without any error. The health check flags it, as an error when the project segments.
+
 ### Smart select
 
 Click a flower and get the flower. This is [SAM](https://segment-anything.com/) prompted
@@ -131,6 +147,7 @@ the same code. A project folder is plain YOLO on disk, so other tools read it un
 python -m annotation_helper init ./my-project --classes "leaf,stem,fruit"
 python -m annotation_helper check           # orphans, bad rows, unknown class ids
 python -m annotation_helper split --mode lists
+python -m annotation_helper split --shapes segment   # only images that have a mask
 python -m annotation_helper train --dry-run # prints the exact ultralytics command
 ```
 

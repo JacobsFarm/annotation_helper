@@ -10,6 +10,7 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import type { DatasetEntry, DatasetSummary, ImageArea } from '@shared/ipc'
 import { isImageFile, labelNameFor, parseLabelText } from '@shared/label-io'
+import { countShapeKinds, kindFromCounts } from '@shared/shapes'
 import type { Project } from '@shared/project'
 import { imageUrl } from '../protocol'
 import { readImageSize } from './image-size'
@@ -68,7 +69,16 @@ export async function listDataset(
   const inInput = sorted(await collect(dirs.input, dirs.input)).filter((f) => !known.has(f))
 
   const entries: DatasetEntry[] = []
-  const summary: DatasetSummary = { total: 0, pending: 0, labelled: 0, backgrounds: 0, shapes: 0 }
+  const summary: DatasetSummary = {
+    total: 0,
+    pending: 0,
+    labelled: 0,
+    backgrounds: 0,
+    shapes: 0,
+    boxImages: 0,
+    polygonImages: 0,
+    mixedImages: 0
+  }
 
   const areas: [ImageArea, string[]][] = [
     ['input', inInput],
@@ -81,20 +91,29 @@ export async function listDataset(
       const size = await readImageSize(imagePath)
       if (!size) continue
 
-      let shapeCount = 0
+      let boxes = 0
+      let polygons = 0
       let labelled = false
       try {
         const text = await readFile(join(labels, labelNameFor(file)), 'utf-8')
         labelled = true
-        shapeCount = parseLabelText(text, size.width, size.height).shapes.length
+        const tally = countShapeKinds(parseLabelText(text, size.width, size.height).shapes)
+        boxes = tally.boxes
+        polygons = tally.polygons
       } catch {
         labelled = false
       }
 
+      const shapeCount = boxes + polygons
+      const kind = kindFromCounts(boxes, polygons, labelled)
+
       summary.total += 1
       if (area === 'input') summary.pending += 1
       if (labelled) summary.labelled += 1
-      if (labelled && shapeCount === 0) summary.backgrounds += 1
+      if (kind === 'background') summary.backgrounds += 1
+      if (kind === 'box') summary.boxImages += 1
+      if (kind === 'polygon') summary.polygonImages += 1
+      if (kind === 'mixed') summary.mixedImages += 1
       summary.shapes += shapeCount
 
       entries.push({
@@ -104,6 +123,9 @@ export async function listDataset(
         height: size.height,
         labelled,
         shapeCount,
+        boxCount: boxes,
+        polygonCount: polygons,
+        kind,
         url: imageUrl(imagePath)
       })
     }

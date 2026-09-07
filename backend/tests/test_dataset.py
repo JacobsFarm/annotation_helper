@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from annotation_helper.dataset import (
     health_check,
     iter_images,
@@ -121,3 +123,94 @@ def test_split_with_no_test_ratio_gives_test_nothing(populated):
     result = split_dataset(populated, mode="lists")
     assert result.test == 0
     assert result.train + result.val == 10
+
+
+# --- boxes and polygons kept apart ------------------------------------------
+
+
+def test_index_counts_each_shape_kind(kinds):
+    entries = {e.file: e for e in refresh_index(kinds)}
+
+    assert entries["img_00.png"].kind == "polygon"
+    assert entries["img_04.png"].kind == "box"
+    assert entries["img_07.png"].kind == "mixed"
+    assert (entries["img_07.png"].box_count, entries["img_07.png"].polygon_count) == (1, 1)
+    assert entries["img_09.png"].kind == "background"
+    assert entries["img_10.png"].kind == "none"  # no label file: not looked at yet
+
+
+def test_index_counts_survive_the_cache(kinds):
+    refresh_index(kinds)
+    cached = load_index(kinds)
+    assert cached["img_00.png"].polygon_count == 1
+    assert cached["img_04.png"].box_count == 1
+
+
+def test_health_check_tallies_images_per_kind(kinds):
+    report = health_check(kinds)
+    assert report.per_kind == {"polygon": 4, "box": 3, "mixed": 2, "background": 1}
+    assert (report.boxes, report.polygons) == (5, 6)
+
+
+def test_mixed_file_is_only_a_warning_for_a_detection_project(kinds):
+    report = health_check(kinds)  # the fixture's task is "detect"
+    mixed = [i for i in report.issues if i.code == "mixed_shape_kinds"]
+    assert len(mixed) == 2
+    assert {i.level for i in mixed} == {"warning"}
+    assert report.errors == 0
+    assert not any(i.code == "box_only_image" for i in report.issues)
+
+
+def test_mixed_file_is_an_error_for_a_segmentation_project(kinds):
+    """One box row among polygons is read as a two-point polygon and becomes nonsense."""
+    kinds.task = "segment"
+    report = health_check(kinds)
+
+    assert [i.level for i in report.issues if i.code == "mixed_shape_kinds"] == ["error"] * 2
+    assert report.errors == 2
+    assert sum(1 for i in report.issues if i.code == "box_only_image") == 3
+
+
+def test_split_for_segmentation_leaves_out_what_has_no_mask(kinds):
+    result = split_dataset(kinds, mode="lists", shapes="segment")
+
+    assert result.train + result.val + result.test == 5  # 4 polygon + 1 background
+    assert result.skipped_kind == 5  # 3 box-only + 2 mixed
+    assert result.skipped == 2  # the unlabelled ones, as always
+
+    listed = "".join(
+        (kinds.output_dir / f"{name}.txt").read_text() for name in ("train", "val", "test")
+    )
+    for boxed in ("img_04", "img_05", "img_06", "img_07", "img_08"):
+        assert boxed not in listed
+
+
+def test_split_for_detection_flattens_every_polygon(kinds):
+    result = split_dataset(kinds, mode="copy", shapes="detect")
+
+    assert result.train + result.val + result.test == 10  # nothing is excluded
+    assert result.skipped_kind == 0
+    assert result.converted == 6  # 4 polygon-only + 2 mixed
+
+    for split in ("train", "val", "test"):
+        for label in (kinds.output_dir / split / "labels").glob("*.txt"):
+            for line in label.read_text().splitlines():
+                assert len(line.split()) == 5, f"{label.name}: {line}"
+
+
+def test_split_for_detection_never_touches_the_source_labels(kinds):
+    split_dataset(kinds, mode="copy", shapes="detect")
+    original = (kinds.labels_dir / "img_00.txt").read_text().split()
+    assert len(original) == 7  # still a polygon where the work was done
+
+
+def test_split_for_detection_refuses_lists_mode(kinds):
+    """Lists mode copies nothing, so there is no file to write the conversion into."""
+    with pytest.raises(ValueError, match="lists"):
+        split_dataset(kinds, mode="lists", shapes="detect")
+
+
+def test_split_without_a_selection_is_unchanged(kinds):
+    result = split_dataset(kinds, mode="lists")
+    assert result.train + result.val + result.test == 10
+    assert (result.skipped_kind, result.converted) == (0, 0)

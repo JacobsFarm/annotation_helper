@@ -103,6 +103,51 @@ class Polygon:
 
 Shape = Union[Box, Polygon]
 
+AnnotationKind = Literal["none", "background", "box", "polygon", "mixed"]
+"""Which training task an image's shapes can feed.
+
+The two kinds are not interchangeable, and only in one direction is that free: a polygon
+flattens to its own bounding box, a box cannot invent the mask it never had. So
+`polygon` feeds detection *and* segmentation, `box` feeds detection only, and `mixed` is
+the trap - ultralytics decides per *file*, and one box row among polygons is read as a
+two-point polygon, which turns into a nonsense box without ever raising.
+"""
+
+
+def count_kinds(shapes: list[Shape]) -> tuple[int, int]:
+    """(boxes, polygons)."""
+    boxes = sum(1 for s in shapes if isinstance(s, Box))
+    return boxes, len(shapes) - boxes
+
+
+def kind_from_counts(boxes: int, polygons: int, labelled: bool = True) -> AnnotationKind:
+    """Classify one image from its tallies. `labelled=False` is "not looked at",
+    which is not the same as an empty label file - that one is a verified background.
+    """
+    if not labelled:
+        return "none"
+    if boxes and polygons:
+        return "mixed"
+    if polygons:
+        return "polygon"
+    if boxes:
+        return "box"
+    return "background"
+
+
+def annotation_kind(shapes: list[Shape], labelled: bool = True) -> AnnotationKind:
+    return kind_from_counts(*count_kinds(shapes), labelled)
+
+
+def trains_segmentation(kind: AnnotationKind) -> bool:
+    """A background is a valid negative for either task; a box-only image is not a mask."""
+    return kind in ("polygon", "background")
+
+
+def to_boxes(shapes: list[Shape]) -> list[Box]:
+    """Flatten to detection shapes. Applied on export, never to the stored annotation."""
+    return [s if isinstance(s, Box) else s.to_box() for s in shapes]
+
 
 def shape_from_dict(data: dict[str, Any]) -> Shape:
     """Inverse of `to_dict`. Used by the sidecar protocol and the project scratch file."""
@@ -149,6 +194,10 @@ class ImageAnnotation:
     @property
     def is_background(self) -> bool:
         return self.reviewed and not self.shapes
+
+    @property
+    def kind(self) -> AnnotationKind:
+        return annotation_kind(self.shapes, self.reviewed)
 
     def to_dict(self) -> dict[str, Any]:
         return {

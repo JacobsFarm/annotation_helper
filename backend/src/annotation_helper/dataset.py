@@ -13,10 +13,11 @@ from pathlib import Path
 from typing import Any, Iterator, Literal
 
 from .imageinfo import image_size
-from .labels import IMAGE_EXTENSIONS, label_path_for, read_labels
+from .labels import IMAGE_EXTENSIONS, boxes_only_text, label_path_for, read_labels
 from .project import Project
+from .shapes import AnnotationKind, count_kinds, kind_from_counts, trains_segmentation
 
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 
 
 @dataclass(slots=True)
@@ -30,6 +31,13 @@ class ImageEntry:
     size: int
     shape_count: int = 0
     labelled: bool = False  # a label file exists (possibly empty = verified background)
+    box_count: int = 0
+    polygon_count: int = 0
+
+    @property
+    def kind(self) -> AnnotationKind:
+        """Which task this image can train. See `shapes.AnnotationKind`."""
+        return kind_from_counts(self.box_count, self.polygon_count, self.labelled)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +48,8 @@ class ImageEntry:
             "size": self.size,
             "shapeCount": self.shape_count,
             "labelled": self.labelled,
+            "boxCount": self.box_count,
+            "polygonCount": self.polygon_count,
         }
 
     @classmethod
@@ -52,6 +62,8 @@ class ImageEntry:
             size=int(data["size"]),
             shape_count=int(data.get("shapeCount", 0)),
             labelled=bool(data.get("labelled", False)),
+            box_count=int(data.get("boxCount", 0)),
+            polygon_count=int(data.get("polygonCount", 0)),
         )
 
 
@@ -79,6 +91,7 @@ def scan(project: Project, recursive: bool = True) -> list[ImageEntry]:
         width, height = size
         stat = path.stat()
         label = read_labels(label_path_for(path, project.labels_dir), width, height)
+        boxes, polygons = count_kinds(label.shapes)
         entries.append(
             ImageEntry(
                 file=path.relative_to(project.images_dir).as_posix(),
@@ -88,6 +101,8 @@ def scan(project: Project, recursive: bool = True) -> list[ImageEntry]:
                 size=stat.st_size,
                 shape_count=len(label.shapes),
                 labelled=label.existed,
+                box_count=boxes,
+                polygon_count=polygons,
             )
         )
     return entries
@@ -154,6 +169,7 @@ def refresh_index(project: Project, recursive: bool = True) -> list[ImageEntry]:
             width, height = size
 
         label = read_labels(label_path_for(path, project.labels_dir), width, height)
+        boxes, polygons = count_kinds(label.shapes)
         entries.append(
             ImageEntry(
                 file=rel,
@@ -163,6 +179,8 @@ def refresh_index(project: Project, recursive: bool = True) -> list[ImageEntry]:
                 size=stat.st_size,
                 shape_count=len(label.shapes),
                 labelled=label.existed,
+                box_count=boxes,
+                polygon_count=polygons,
             )
         )
 
@@ -194,7 +212,11 @@ class HealthReport:
     labelled: int = 0
     backgrounds: int = 0
     shapes: int = 0
+    boxes: int = 0
+    polygons: int = 0
     per_class: dict[int, int] = field(default_factory=dict)
+    per_kind: dict[str, int] = field(default_factory=dict)
+    """Labelled images per `AnnotationKind`: box, polygon, mixed, background."""
     issues: list[DatasetIssue] = field(default_factory=list)
 
     @property
@@ -212,7 +234,10 @@ class HealthReport:
             "unlabelled": self.unlabelled,
             "backgrounds": self.backgrounds,
             "shapes": self.shapes,
+            "boxes": self.boxes,
+            "polygons": self.polygons,
             "perClass": {str(k): v for k, v in sorted(self.per_class.items())},
+            "perKind": dict(self.per_kind),
             "issues": [i.to_dict() for i in self.issues],
         }
 
@@ -226,6 +251,7 @@ def health_check(project: Project, recursive: bool = True) -> HealthReport:
     report = HealthReport()
     known_classes = {c.id for c in project.classes}
     seen_labels: set[Path] = set()
+    segmenting = project.task in ("segment", "both")
 
     for path in iter_images(project.images_dir, recursive):
         report.images += 1
@@ -262,6 +288,28 @@ def health_check(project: Project, recursive: bool = True) -> HealthReport:
                     DatasetIssue("unknown_class_id", "error", rel, str(shape.class_id))
                 )
 
+        boxes, polygons = count_kinds(result.shapes)
+        report.boxes += boxes
+        report.polygons += polygons
+        kind = kind_from_counts(boxes, polygons)
+        report.per_kind[kind] = report.per_kind.get(kind, 0) + 1
+
+        # Boxes and polygons in one file are legal on disk and fine for detection, where
+        # a polygon is read as its bounding box anyway. For segmentation they are not:
+        # ultralytics decides per file, so the box rows are re-read as two-point polygons
+        # and silently become nonsense. That is an error worth stopping for.
+        if kind == "mixed":
+            report.issues.append(
+                DatasetIssue(
+                    "mixed_shape_kinds",
+                    "error" if segmenting else "warning",
+                    rel,
+                    f"{boxes} box, {polygons} polygon",
+                )
+            )
+        elif segmenting and kind == "box":
+            report.issues.append(DatasetIssue("box_only_image", "warning", rel, str(boxes)))
+
     # Orphan labels: a label whose image was deleted or renamed still trains as data.
     if project.labels_dir.is_dir():
         for label_file in sorted(project.labels_dir.rglob("*.txt")):
@@ -275,12 +323,28 @@ def health_check(project: Project, recursive: bool = True) -> HealthReport:
 # --- split ------------------------------------------------------------------
 
 
+ShapeSelection = Literal["any", "segment", "detect"]
+"""Which half of the work a split is for.
+
+    any      everything as annotated - boxes stay boxes, polygons stay polygons
+    segment  only images a mask can be learned from: polygon-only, plus backgrounds
+    detect   everything, with each polygon written out as its bounding box
+
+`detect` is the direction that costs nothing; there is no `segment` counterpart,
+because a box cannot be turned back into the mask it never held.
+"""
+
+
 @dataclass(slots=True)
 class SplitResult:
     train: int = 0
     val: int = 0
     test: int = 0
     skipped: int = 0
+    skipped_kind: int = 0
+    """Labelled images left out because their shapes cannot train the chosen task."""
+    converted: int = 0
+    """Images whose polygons were written out as boxes."""
     output: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -289,8 +353,19 @@ class SplitResult:
             "val": self.val,
             "test": self.test,
             "skipped": self.skipped,
+            "skippedKind": self.skipped_kind,
+            "converted": self.converted,
             "output": self.output,
         }
+
+
+def label_kind(label_file: Path) -> AnnotationKind:
+    """The shape kinds in one label file.
+
+    Parsed at 1 x 1 on purpose: only the tallies are wanted here, and how many rows are
+    boxes does not depend on the image size. Saves an image header read per file.
+    """
+    return kind_from_counts(*count_kinds(read_labels(label_file, 1, 1).shapes))
 
 
 def _apportion(count: int, ratios: dict[str, float]) -> dict[str, int]:
@@ -321,6 +396,7 @@ def split_dataset(
     mode: Literal["copy", "move", "lists"] = "copy",
     include_unlabelled: bool = False,
     recursive: bool = True,
+    shapes: ShapeSelection = "any",
 ) -> SplitResult:
     """Produce an ultralytics-shaped train/val/test dataset.
 
@@ -330,9 +406,18 @@ def split_dataset(
         lists  - write `train.txt` / `val.txt` / `test.txt` with absolute paths and
                  touch nothing else. Cheapest for large datasets.
 
+    `shapes` picks which annotations belong in this dataset; see `ShapeSelection`. It
+    filters and converts on the way *out*, never in `labels/`: the annotation on disk
+    stays the richest form of the work, and a detection dataset is a view of it.
+
     Ratios and seed come from the project file, so a split is reproducible: same seed,
     same dataset, same partition.
     """
+    if shapes == "detect" and mode == "lists":
+        raise ValueError(
+            "shapes='detect' rewrites label files, which 'lists' mode never copies; "
+            "use copy or move"
+        )
     target = Path(output) if output else project.output_dir
     ratios = project.split
     total_ratio = ratios.train + ratios.val + ratios.test
@@ -340,13 +425,23 @@ def split_dataset(
         raise ValueError("split ratios must add up to more than zero")
 
     candidates: list[Path] = []
+    kinds: dict[Path, AnnotationKind] = {}
     skipped = 0
+    skipped_kind = 0
     for path in iter_images(project.images_dir, recursive):
-        has_label = label_path_for(path, project.labels_dir).is_file()
-        if has_label or include_unlabelled:
-            candidates.append(path)
-        else:
-            skipped += 1
+        label = label_path_for(path, project.labels_dir)
+        if not label.is_file():
+            if include_unlabelled:
+                candidates.append(path)
+            else:
+                skipped += 1
+            continue
+        if shapes != "any":
+            kinds[path] = label_kind(label)
+            if shapes == "segment" and not trains_segmentation(kinds[path]):
+                skipped_kind += 1
+                continue
+        candidates.append(path)
 
     rng = random.Random(ratios.seed)
     rng.shuffle(candidates)
@@ -362,6 +457,7 @@ def split_dataset(
         offset += sizes[name]
 
     target.mkdir(parents=True, exist_ok=True)
+    converted = 0
 
     if mode == "lists":
         for name, items in buckets.items():
@@ -383,7 +479,19 @@ def split_dataset(
             for image in items:
                 transfer(str(image), str(images_out / image.name))
                 label = label_path_for(image, project.labels_dir)
-                if label.is_file():
+                if not label.is_file():
+                    continue
+                if shapes == "detect":
+                    (labels_out / label.name).write_text(
+                        boxes_only_text(label.read_text(encoding="utf-8")),
+                        encoding="utf-8",
+                        newline="\n",
+                    )
+                    if kinds.get(image) in ("polygon", "mixed"):
+                        converted += 1
+                    if mode == "move":
+                        label.unlink()
+                else:
                     transfer(str(label), str(labels_out / label.name))
 
     project.write_data_yaml(target=project.root / "data.yaml", splits_root=target)
@@ -393,5 +501,7 @@ def split_dataset(
         val=len(buckets["val"]),
         test=len(buckets["test"]),
         skipped=skipped,
+        skipped_kind=skipped_kind,
+        converted=converted,
         output=str(target),
     )

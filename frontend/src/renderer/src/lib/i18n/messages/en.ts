@@ -140,6 +140,16 @@ export default {
     'Click the object to select it. Right-click (or Alt+click) the parts it should not include, Backspace takes a click back. Enter keeps the mask, Esc throws it away.',
 
   // --- dataset ---
+  annotate_filter_boxes: 'Box',
+  annotate_filter_polygons: 'Seg',
+  annotate_kind_box: 'Box',
+  annotate_kind_polygon: 'Seg',
+  annotate_kind_mixed: 'Both',
+  annotate_kind_box_hint: 'Boxes only. Trains detection, never segmentation.',
+  annotate_kind_polygon_hint: 'Polygons. Trains segmentation, and detection via their boxes.',
+  annotate_kind_mixed_hint:
+    'Boxes and polygons in one file. Usable for detection; breaks segmentation training.',
+
   dataset_title: 'Dataset',
   dataset_summary: 'Overview',
   dataset_images: 'Images',
@@ -153,6 +163,13 @@ export default {
   dataset_backgrounds: 'Background samples',
   dataset_shapes: 'Shapes',
   dataset_per_class: 'Per class',
+  dataset_kinds: 'Annotation kinds',
+  dataset_kind_box: 'Boxes only',
+  dataset_kind_polygon: 'Polygons',
+  dataset_kind_mixed: 'Both kinds',
+  dataset_kind_hint:
+    'A polygon flattens to its own box, so it trains either task. A box cannot become a mask, so a box-only image trains detection only. An image holding both breaks segmentation training.',
+  dataset_health_kinds: '{boxes} boxes, {polygons} polygons',
   dataset_health: 'Health check',
   dataset_health_run: 'Run health check',
   dataset_health_clean: 'No problems found.',
@@ -171,6 +188,14 @@ export default {
   dataset_split_seed: 'Seed',
   dataset_split_seed_hint: 'Same seed, same dataset, same partition.',
   dataset_split_include: 'Include unlabelled images',
+  dataset_split_shapes: 'Annotations',
+  dataset_split_shapes_hint:
+    'Segmentation leaves out what has no mask. Detection writes every polygon out as its bounding box, and never touches your label files.',
+  dataset_split_shapes_any: 'As annotated',
+  dataset_split_shapes_segment: 'Segmentation only',
+  dataset_split_shapes_detect: 'Detection: polygons as boxes',
+  dataset_split_left_out: '{count} image(s) left out: no mask to learn from',
+  dataset_split_flattened: '{count} label file(s) written out as boxes',
   dataset_split_done: 'train {train}, val {val}, test {test} ({skipped} skipped)',
   dataset_export: 'Write data.yaml and classes.txt',
   dataset_export_done: 'Configuration files written.',
@@ -198,6 +223,8 @@ export default {
   train_log: 'Output',
   train_log_empty: 'No run started yet.',
   train_needs_split: 'Create a split first: training reads data.yaml.',
+  train_segment_gap:
+    'This project segments, but {boxes} image(s) hold only boxes and {mixed} hold both kinds. Split with "Segmentation only" on the Dataset screen, or those images train nothing useful.',
   train_finished: 'Finished with exit code {code}',
 
   // --- settings ---
@@ -319,6 +346,8 @@ export default {
 
   // --- dataset issue codes ---
   issue_missing_label: 'No label file',
+  issue_mixed_shape_kinds: 'Boxes and polygons in one file',
+  issue_box_only_image: 'Only boxes, so no mask to learn from',
   issue_orphan_label: 'Label without an image',
   issue_unreadable_image: 'Image could not be read',
   issue_unknown_class_id: 'Class id not in this project',

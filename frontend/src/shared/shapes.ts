@@ -29,6 +29,41 @@ export interface PolygonShape {
 export type Shape = BoxShape | PolygonShape
 export type ShapeKind = Shape['kind']
 
+/**
+ * Which training task an image's shapes can feed.
+ *
+ * The two kinds are not interchangeable, and only in one direction is that free: a
+ * polygon flattens to its own bounding box, a box cannot invent the mask it never had.
+ * So `polygon` feeds detection *and* segmentation, `box` feeds detection only, and
+ * `mixed` is the trap - ultralytics decides per *file*, so one box row among polygons
+ * is read as a two-point polygon and silently becomes a nonsense box.
+ */
+export type AnnotationKind = 'none' | 'background' | 'box' | 'polygon' | 'mixed'
+
+export function countShapeKinds(shapes: Shape[]): { boxes: number; polygons: number } {
+  const boxes = shapes.reduce((n, s) => n + (s.kind === 'box' ? 1 : 0), 0)
+  return { boxes, polygons: shapes.length - boxes }
+}
+
+/** `labelled: false` is "not looked at"; an empty label file is a verified background. */
+export function kindFromCounts(boxes: number, polygons: number, labelled = true): AnnotationKind {
+  if (!labelled) return 'none'
+  if (boxes && polygons) return 'mixed'
+  if (polygons) return 'polygon'
+  if (boxes) return 'box'
+  return 'background'
+}
+
+export function annotationKind(shapes: Shape[], labelled = true): AnnotationKind {
+  const { boxes, polygons } = countShapeKinds(shapes)
+  return kindFromCounts(boxes, polygons, labelled)
+}
+
+/** A background is a valid negative for either task; a box-only image is not a mask. */
+export function trainsSegmentation(kind: AnnotationKind): boolean {
+  return kind === 'polygon' || kind === 'background'
+}
+
 export interface ImageAnnotation {
   imageFile: string
   width: number

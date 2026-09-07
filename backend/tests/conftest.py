@@ -53,3 +53,28 @@ def populated(project):
         elif i < 10:
             write_labels(project.labels_dir / f"{image.stem}.txt", [], 64, 48)
     return project
+
+
+@pytest.fixture
+def kinds(project):
+    """12 images spread over every annotation kind.
+
+    4 polygon-only, 3 box-only, 2 mixed, 1 verified background, 2 untouched. Enough to
+    tell "can train a mask" from "can only train a box" in every direction.
+    """
+    from annotation_helper.shapes import Polygon
+
+    triangle = [(6.0, 6.0), (40.0, 10.0), (20.0, 38.0)]
+    plan = (
+        [[Polygon(0, list(triangle))]] * 4
+        + [[Box(0, 8, 8, 40, 32)]] * 3
+        + [[Polygon(1, list(triangle)), Box(0, 8, 8, 40, 32)]] * 2
+        + [[]]
+    )
+    for i in range(12):
+        image = write_png(project.images_dir / f"img_{i:02d}.png", 64, 48)
+        if i < len(plan):
+            write_labels(project.labels_dir / f"{image.stem}.txt", plan[i], 64, 48)
+    project.classes.append(project.classes[0].__class__(1, "second"))
+    project.save()
+    return project
