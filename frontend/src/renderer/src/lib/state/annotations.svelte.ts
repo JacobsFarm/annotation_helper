@@ -26,6 +26,13 @@ let saving = $state(false)
 let past: Shape[][] = []
 let future: Shape[][] = []
 
+/**
+ * Bumped on every load, so a slow prediction can tell whether the image it was asked
+ * for is still the one on screen. Saving deliberately does not bump it: a save can
+ * promote the file out of the inbox and rename it, and that is still the same image.
+ */
+let generation = 0
+
 export function current(): ImageAnnotation | null {
   return annotation
 }
@@ -58,6 +65,10 @@ export function canRedo(): boolean {
   return future.length > 0
 }
 
+export function annotationGeneration(): number {
+  return generation
+}
+
 // --- loading ----------------------------------------------------------------
 
 export async function loadAnnotation(root: string, file: string): Promise<void> {
@@ -67,6 +78,7 @@ export async function loadAnnotation(root: string, file: string): Promise<void> 
   dirty = false
   past = []
   future = []
+  generation += 1
 }
 
 export function clearAnnotation(): void {
@@ -75,6 +87,7 @@ export function clearAnnotation(): void {
   dirty = false
   past = []
   future = []
+  generation += 1
 }
 
 // --- editing ----------------------------------------------------------------

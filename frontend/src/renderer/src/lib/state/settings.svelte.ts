@@ -14,6 +14,7 @@ const FALLBACK: AppSettings = {
   theme: 'system',
   pythonPath: '',
   autosave: true,
+  autoPredict: false,
   recent: []
 }
 

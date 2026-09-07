@@ -56,9 +56,19 @@
   } from '../lib/state/dataset.svelte'
   import { activeClassId, classes, colorFor, nameFor, project } from '../lib/state/project.svelte'
   import { setActiveClass } from '../lib/state/project.svelte'
-  import { settings } from '../lib/state/settings.svelte'
+  import { settings, updateSettings } from '../lib/state/settings.svelte'
   import { pushToast } from '../lib/state/toast.svelte'
-  import { activeTool, cursorPosition, setActiveTool, type ToolId } from '../lib/state/tool.svelte'
+  import {
+    activeTool,
+    cursorPosition,
+    eraserSize,
+    ERASER_MAX,
+    ERASER_MIN,
+    setActiveTool,
+    setEraserSize,
+    stepEraserSize,
+    type ToolId
+  } from '../lib/state/tool.svelte'
   import { actualSize, fit, viewport, zoomStep } from '../lib/state/viewport.svelte'
 
   const FILTERS: DatasetFilter[] = ['all', 'todo', 'done']
@@ -68,14 +78,20 @@
     done: 'annotate_filter_done'
   } as const
 
-  const TOOL_BUTTONS: { id: ToolId; icon: 'select' | 'box' | 'polygon' | 'pan'; label: string }[] = [
+  const TOOL_BUTTONS: {
+    id: ToolId
+    icon: 'select' | 'box' | 'polygon' | 'pan' | 'eraser'
+    label: string
+  }[] = [
     { id: 'select', icon: 'select', label: 'annotate_tool_select' },
     { id: 'box', icon: 'box', label: 'annotate_tool_box' },
     { id: 'polygon', icon: 'polygon', label: 'annotate_tool_polygon' },
+    { id: 'erase', icon: 'eraser', label: 'annotate_tool_erase' },
     { id: 'pan', icon: 'pan', label: 'annotate_tool_pan' }
   ]
 
   let lastLoaded = $state<string | null>(null)
+  let eraserPanel = $state(false)
 
   const entry = $derived(currentEntry())
   const annotation = $derived(current())
@@ -95,6 +111,30 @@
     lastLoaded = file
     if (projectRoot && file) void loadAnnotation(projectRoot, file)
     else clearAnnotation()
+  })
+
+  /**
+   * Predict without being asked, when the switch under the predict button is on.
+   *
+   * Only for an image nobody has looked at yet: on a reviewed image, or one that
+   * already carries shapes, an unrequested prediction would append a second copy of
+   * work that is already there. `imageFile` must match the entry, so this waits for
+   * the label file rather than predicting against the image still on screen.
+   *
+   * `predicted` is deliberately not reactive: it stops a prediction that found nothing
+   * from being asked for again, and it must not re-trigger this effect when it is set.
+   * The effect also re-runs when a prediction ends, which is what lets an image opened
+   * while the model was still busy get its turn.
+   */
+  let predicted: string | null = null
+  $effect(() => {
+    if (!settings().autoPredict || !canPredict() || isPredicting()) return
+    const file = entry?.file
+    const loaded = annotation
+    if (!file || !loaded || loaded.imageFile !== file) return
+    if (loaded.reviewed || loaded.shapes.length > 0 || predicted === file) return
+    predicted = file
+    void predictCurrent(file)
   })
 
   async function navigate(delta: number): Promise<void> {
@@ -139,6 +179,18 @@
 
   function refit(): void {
     if (annotation) fit({ width: annotation.width, height: annotation.height })
+  }
+
+  /**
+   * Picking the eraser opens its size panel, and pressing the button again closes it -
+   * the same place you reach for the tool is the place you resize it. Every other tool
+   * closes the panel, because a floating box over the canvas that belongs to a tool you
+   * are no longer using is just something in the way.
+   */
+  function pickTool(id: ToolId, fromButton = false): void {
+    if (id === 'erase') eraserPanel = !(fromButton && activeTool() === 'erase' && eraserPanel)
+    else eraserPanel = false
+    setActiveTool(id)
   }
 
   function onKeyDown(event: KeyboardEvent): void {
@@ -194,19 +246,31 @@
         removeSelected()
         break
       case 'Escape':
-        select(null)
+        // The eraser panel first: Esc closes what is on top, not the selection under it.
+        if (eraserPanel) eraserPanel = false
+        else select(null)
         break
       case 'v':
-        setActiveTool('select')
+        pickTool('select')
         break
       case 'b':
-        setActiveTool('box')
+        pickTool('box')
         break
       case 'p':
-        setActiveTool('polygon')
+        pickTool('polygon')
+        break
+      case 'g':
+        pickTool('erase')
         break
       case 'h':
-        setActiveTool('pan')
+        pickTool('pan')
+        break
+      // The image-editor convention for brush size, and it only means that while the
+      // eraser is the tool in hand.
+      case '[':
+      case ']':
+        if (activeTool() !== 'erase') return
+        stepEraserSize(event.key === '[' ? -1 : 1)
         break
       case 'f':
         refit()
@@ -304,7 +368,7 @@
             icon={button.icon}
             title={t(button.label as never)}
             active={activeTool() === button.id}
-            onclick={() => setActiveTool(button.id)}
+            onclick={() => pickTool(button.id, true)}
           />
         {/each}
       </div>
@@ -384,6 +448,45 @@
         />
       {:else}
         <div class="empty">{t('annotate_no_images')}</div>
+      {/if}
+
+      <!-- Brush-size popover, in the corner of the canvas rather than in the toolbar:
+           the preview dot only means something next to the image it erases on. -->
+      {#if activeTool() === 'erase' && eraserPanel}
+        <div class="eraser-panel">
+          <div class="eraser-head">
+            <Icon name="eraser" size={13} />
+            <span class="eraser-title">{t('annotate_eraser')}</span>
+            <button
+              class="row-delete"
+              title={t('common_close')}
+              aria-label={t('common_close')}
+              onclick={() => (eraserPanel = false)}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+          <div class="eraser-body">
+            <div class="eraser-preview">
+              <span
+                style:width="{Math.min(eraserSize(), 44)}px"
+                style:height="{Math.min(eraserSize(), 44)}px"
+              ></span>
+            </div>
+            <label class="eraser-slider">
+              <span class="muted">{t('annotate_eraser_size')}</span>
+              <input
+                type="range"
+                min={ERASER_MIN}
+                max={ERASER_MAX}
+                value={eraserSize()}
+                oninput={(event) => setEraserSize(Number(event.currentTarget.value))}
+              />
+            </label>
+            <span class="eraser-value mono">{eraserSize()}</span>
+          </div>
+          <p class="eraser-keys muted">{t('annotate_eraser_keys')}</p>
+        </div>
       {/if}
     </div>
 
@@ -487,6 +590,18 @@
           {t('annotate_predict')}
         </Button>
       {/if}
+
+      <label class="auto" title={t('annotate_auto_predict_hint')}>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={settings().autoPredict}
+          disabled={!canPredict()}
+          onchange={(event) => updateSettings({ autoPredict: event.currentTarget.checked })}
+        />
+        <span class="auto-name">{t('annotate_auto_predict')}</span>
+        <span class="auto-state">{settings().autoPredict ? t('common_on') : t('common_off')}</span>
+      </label>
     </div>
   </aside>
 </div>
@@ -703,6 +818,85 @@
     position: relative;
   }
 
+  .eraser-panel {
+    position: absolute;
+    top: var(--space-3);
+    left: var(--space-3);
+    width: 232px;
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .eraser-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+  }
+
+  .eraser-title {
+    flex: 1;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .eraser-body {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* A dot the size of the eraser, so the number is not the only thing to go on. It stops
+     growing at the edge of its box; past that the circle on the canvas is the truth. */
+  .eraser-preview {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-sunken);
+    overflow: hidden;
+  }
+
+  .eraser-preview span {
+    border-radius: 50%;
+    background: oklch(58% 0.19 27 / 0.12);
+    border: 1px solid var(--danger);
+  }
+
+  .eraser-slider {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    font-size: var(--text-xs);
+  }
+
+  .eraser-slider input {
+    width: 100%;
+    accent-color: var(--danger);
+  }
+
+  .eraser-value {
+    width: 4ch;
+    text-align: right;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .eraser-keys {
+    margin: 0;
+    font-size: var(--text-xs);
+  }
+
   .statusbar {
     display: flex;
     align-items: center;
@@ -738,6 +932,72 @@
     height: 100%;
     background: var(--brand);
     transition: width 150ms ease;
+  }
+
+  .auto {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .auto:has(input:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .auto-name {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .auto-state {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* A switch rather than a checkbox: this is an on/off mode, not a form value. */
+  .auto input {
+    appearance: none;
+    flex: none;
+    width: 28px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--bg-sunken);
+    cursor: inherit;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+
+  .auto input::before {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    margin: 2px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    transition: transform 120ms ease, background 120ms ease;
+  }
+
+  .auto input:checked {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+
+  .auto input:checked::before {
+    background: var(--bg-raised);
+    transform: translateX(12px);
+  }
+
+  .auto input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
   }
 
   .empty {

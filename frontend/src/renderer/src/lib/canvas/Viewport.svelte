@@ -8,8 +8,9 @@
    * image pixels directly - so no layer ever recomputes the scale for itself.
    */
   import { screenPoint, toImage, type Viewport as ViewportTransform } from '@shared/geometry'
-  import type { Shape } from '@shared/shapes'
+  import type { PolygonShape, Shape } from '@shared/shapes'
   import { toolById } from './tools'
+  import { eraserRadius } from './tools/erase'
   import ShapeLayer from './ShapeLayer.svelte'
   import Overlay from './Overlay.svelte'
   import {
@@ -52,6 +53,12 @@
   const view = $derived<ViewportTransform>(viewport())
   const tool = $derived(toolById(activeTool()))
   const selectedShape = $derived(shapes.find((s) => s.id === selected[0]) ?? null)
+  // The selected polygon already draws its own handles, so it is left out here.
+  const eraserGhosts = $derived(
+    activeTool() === 'erase'
+      ? shapes.filter((s): s is PolygonShape => s.kind === 'polygon' && s.id !== selected[0])
+      : []
+  )
   const hover = $derived(handleHover())
   const cursor = $derived.by(() => {
     if (panning || activeTool() === 'pan') return 'grabbing'
@@ -187,6 +194,8 @@
         scale={view.scale}
         image={{ width, height }}
         {showCrosshair}
+        eraser={activeTool() === 'erase' ? eraserRadius(view.scale) : null}
+        ghosts={eraserGhosts}
       />
     </svg>
   </div>

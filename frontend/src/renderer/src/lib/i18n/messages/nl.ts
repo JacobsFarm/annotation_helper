@@ -27,6 +27,8 @@ const nl: Record<keyof typeof en, string> = {
   common_all: 'Alles',
   common_yes: 'Ja',
   common_no: 'Nee',
+  common_on: 'Aan',
+  common_off: 'Uit',
   common_of: 'van',
   common_loading: 'Laden…',
   common_copy: 'Kopiëren',
@@ -63,6 +65,10 @@ const nl: Record<keyof typeof en, string> = {
   annotate_tool_box: 'Box',
   annotate_tool_polygon: 'Polygoon',
   annotate_tool_pan: 'Verschuiven',
+  annotate_tool_erase: 'Gum',
+  annotate_eraser: 'Gum',
+  annotate_eraser_size: 'Grootte',
+  annotate_eraser_keys: '[ en ] maken de gum kleiner en groter.',
   annotate_zoom_in: 'Inzoomen',
   annotate_zoom_out: 'Uitzoomen',
   annotate_zoom_fit: 'Passend maken',
@@ -80,6 +86,9 @@ const nl: Record<keyof typeof en, string> = {
   annotate_predict_running: 'Bezig met voorspellen…',
   annotate_predict_cancel: 'Voorspelling annuleren',
   annotate_clear_ai: 'Voorspellingen verwijderen',
+  annotate_auto_predict: 'Automatisch voorspellen',
+  annotate_auto_predict_hint:
+    'Voorspelt meteen bij het inladen van een afbeelding die nog geen labels heeft.',
 
   // --- annoteren: panelen ---
   annotate_images: 'Afbeeldingen',
@@ -117,6 +126,8 @@ const nl: Record<keyof typeof en, string> = {
   annotate_hint_select:
     'Slepen verplaatst, een handvat sleept de maat. Bij een polygoon: trek een klein randbolletje uit voor een nieuw punt, rechtsklik of dubbelklik een punt om het te verwijderen, Shift houdt randen recht.',
   annotate_hint_pan: 'Sleep om te verschuiven. De middelste muisknop doet dit altijd.',
+  annotate_hint_erase:
+    'Sleep over de punten om ze te wissen. Werkt op de geselecteerde polygoon; een polygoon houdt minstens drie punten over. [ en ] wijzigen de grootte.',
 
   // --- dataset ---
   dataset_title: 'Dataset',

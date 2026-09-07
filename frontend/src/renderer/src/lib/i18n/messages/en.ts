@@ -29,6 +29,8 @@ export default {
   common_all: 'All',
   common_yes: 'Yes',
   common_no: 'No',
+  common_on: 'On',
+  common_off: 'Off',
   common_of: 'of',
   common_loading: 'Loading…',
   common_copy: 'Copy',
@@ -64,6 +66,10 @@ export default {
   annotate_tool_box: 'Box',
   annotate_tool_polygon: 'Polygon',
   annotate_tool_pan: 'Pan',
+  annotate_tool_erase: 'Eraser',
+  annotate_eraser: 'Eraser',
+  annotate_eraser_size: 'Size',
+  annotate_eraser_keys: '[ and ] make the eraser smaller and bigger.',
   annotate_zoom_in: 'Zoom in',
   annotate_zoom_out: 'Zoom out',
   annotate_zoom_fit: 'Fit to window',
@@ -81,6 +87,8 @@ export default {
   annotate_predict_running: 'Predicting…',
   annotate_predict_cancel: 'Cancel prediction',
   annotate_clear_ai: 'Remove predictions',
+  annotate_auto_predict: 'Predict automatically',
+  annotate_auto_predict_hint: 'Predicts as soon as an image without labels loads.',
 
   // --- annotate: panels ---
   annotate_images: 'Images',
@@ -118,6 +126,8 @@ export default {
   annotate_hint_select:
     'Drag to move, drag a handle to resize. On a polygon: pull a small edge dot out for a new point, right-click or double-click a point to remove it, hold Shift for straight edges.',
   annotate_hint_pan: 'Drag to pan. The middle mouse button does this from any tool.',
+  annotate_hint_erase:
+    'Drag over points to erase them. Works on the selected polygon; a polygon keeps at least three points. [ and ] resize the eraser.',
 
   // --- dataset ---
   dataset_title: 'Dataset',

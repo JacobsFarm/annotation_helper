@@ -6,7 +6,9 @@
  * later is a new file in `canvas/tools/`, not a new tab and not a new state store.
  */
 
-export type ToolId = 'select' | 'box' | 'polygon' | 'pan'
+import { clamp } from '@shared/geometry'
+
+export type ToolId = 'select' | 'box' | 'polygon' | 'pan' | 'erase'
 
 export interface DraftBox {
   x1: number
@@ -74,6 +76,36 @@ export function setHandleHover(next: HandleHover | null): void {
   // changes, and an equal object would re-render the overlay on every mouse move.
   if (next?.kind === hover?.kind && next?.index === hover?.index) return
   hover = next
+}
+
+// --- the eraser ---------------------------------------------------------------
+//
+// Its size is the diameter, in *screen* pixels, the way a brush size reads in an image
+// editor. Screen rather than image pixels because it is a pointing aid: the circle keeps
+// the same size under the hand at every zoom level, exactly like the grab tolerance in
+// `canvas/tools/types.ts`. The size lives here, next to the active tool, so the toolbar
+// panel, the overlay circle and the tool itself all read one number.
+
+export const ERASER_MIN = 4
+export const ERASER_MAX = 400
+
+let eraser = $state(40)
+
+export function eraserSize(): number {
+  return eraser
+}
+
+export function setEraserSize(px: number): void {
+  eraser = Math.round(clamp(px, ERASER_MIN, ERASER_MAX))
+}
+
+/**
+ * One press of `[` or `]`. The step grows with the size, so shrinking a big eraser does
+ * not take twenty presses and a small one still lands on the pixel you want.
+ */
+export function stepEraserSize(direction: number): void {
+  const step = eraser < 20 ? 2 : eraser < 60 ? 5 : eraser < 150 ? 10 : 25
+  setEraserSize(eraser + step * Math.sign(direction))
 }
 
 export function resetDraft(): void {

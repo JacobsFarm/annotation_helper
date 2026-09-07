@@ -5,7 +5,7 @@
    * Kept apart from `ShapeLayer` so that layer can stay a pure function of the shapes,
    * and so overlay churn during a drag never re-renders the shapes themselves.
    */
-  import type { Shape } from '@shared/shapes'
+  import type { PolygonShape, Shape } from '@shared/shapes'
   import { normaliseBox } from '@shared/shapes'
   import { boxHandles, edgeMidpoints, MIDPOINT_MIN_EDGE } from './tools/select'
   import type { DraftBox, HandleHover } from '../state/tool.svelte'
@@ -19,6 +19,10 @@
     scale: number
     image: { width: number; height: number }
     showCrosshair: boolean
+    /** Eraser radius in image pixels, or null when the eraser is not the active tool. */
+    eraser?: number | null
+    /** Polygons whose points to show even though they are not selected. */
+    ghosts?: PolygonShape[]
   }
 
   const {
@@ -29,7 +33,9 @@
     hover,
     scale,
     image,
-    showCrosshair
+    showCrosshair,
+    eraser = null,
+    ghosts = []
   }: Props = $props()
 
   const stroke = $derived(1.5 / scale)
@@ -45,6 +51,27 @@
     <line x1={cursor.x} y1={0} x2={cursor.x} y2={image.height} />
     <line x1={0} y1={cursor.y} x2={image.width} y2={cursor.y} />
   </g>
+{/if}
+
+<!-- Points on shapes that are not selected. Only the eraser asks for these: a freshly
+     predicted mask is not selected, and erasing points you cannot see is guesswork. -->
+{#each ghosts as shape (shape.id)}
+  {#each shape.points as [x, y], index (index)}
+    <circle class="ghost" cx={x} cy={y} r={midpointSize / 2} stroke-width={stroke} />
+  {/each}
+{/each}
+
+<!-- The eraser circle, drawn where the deleting actually happens rather than as a mouse
+     cursor, so it stays honest at every zoom level. -->
+{#if eraser !== null && cursor}
+  <circle
+    class="eraser"
+    cx={cursor.x}
+    cy={cursor.y}
+    r={eraser}
+    stroke-width={stroke}
+    stroke-dasharray="{4 / scale} {3 / scale}"
+  />
 {/if}
 
 {#if draft}
@@ -123,6 +150,19 @@
     stroke: var(--selection);
     stroke-opacity: 0.35;
     stroke-dasharray: 4 4;
+  }
+
+  .ghost {
+    fill: var(--bg-raised);
+    fill-opacity: 0.45;
+    stroke: var(--selection);
+    stroke-opacity: 0.5;
+  }
+
+  .eraser {
+    fill: var(--danger);
+    fill-opacity: 0.1;
+    stroke: var(--danger);
   }
 
   .draft {

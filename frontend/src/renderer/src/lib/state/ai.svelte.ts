@@ -9,7 +9,7 @@
 import type { Compute, PackageStatus, PythonStatus } from '@shared/ipc'
 import { api, safeCall } from '../api'
 import { t } from '../i18n/index.svelte'
-import { addPredicted } from './annotations.svelte'
+import { addPredicted, annotationGeneration } from './annotations.svelte'
 import { project } from './project.svelte'
 import { pushToast } from './toast.svelte'
 
@@ -64,13 +64,17 @@ export async function predictCurrent(file: string): Promise<void> {
   running = true
   progress = 0
   stage = ''
+  const asked = annotationGeneration()
   const result = await safeCall(() =>
     api.ai.predict({ root: open.root, file, options: open.ai })
   )
   running = false
   progress = 0
 
-  if (result) addPredicted(result.shapes)
+  // Automatic prediction fires on every image that opens, so the user can already be
+  // two images further by the time this returns. Shapes belong to the image they were
+  // asked for, and to no other.
+  if (result && annotationGeneration() === asked) addPredicted(result.shapes)
 }
 
 export async function cancelPredict(): Promise<void> {

@@ -24,7 +24,12 @@ export interface ToolEvent {
 export interface Tool {
   id: ToolId
   cursor: string
-  hintKey: 'annotate_hint_select' | 'annotate_hint_box' | 'annotate_hint_polygon' | 'annotate_hint_pan'
+  hintKey:
+    | 'annotate_hint_select'
+    | 'annotate_hint_box'
+    | 'annotate_hint_polygon'
+    | 'annotate_hint_pan'
+    | 'annotate_hint_erase'
   onPointerDown(event: ToolEvent): void
   onPointerMove(event: ToolEvent): void
   onPointerUp(event: ToolEvent): void

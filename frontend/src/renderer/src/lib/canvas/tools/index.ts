@@ -1,5 +1,6 @@
 import type { ToolId } from '../../state/tool.svelte'
 import { boxTool } from './box'
+import { eraseTool } from './erase'
 import { panTool } from './pan'
 import { polygonTool } from './polygon'
 import { selectTool } from './select'
@@ -9,7 +10,8 @@ export const TOOLS: Record<ToolId, Tool> = {
   select: selectTool,
   box: boxTool,
   polygon: polygonTool,
-  pan: panTool
+  pan: panTool,
+  erase: eraseTool
 }
 
 export function toolById(id: ToolId): Tool {
