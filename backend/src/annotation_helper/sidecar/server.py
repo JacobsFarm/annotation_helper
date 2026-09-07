@@ -159,6 +159,31 @@ def _predict(server: Server, request: Request) -> dict[str, Any]:
     return predictor.predict(image, options, progress)
 
 
+@method("segment.point")
+def _segment_point(server: Server, request: Request) -> dict[str, Any]:
+    """Interactive segmentation: clicks in, one polygon out. No progress events - the
+    embedding is cached per image, so every click after the first is too fast to report
+    on, and a progress bar that flashes is worse than none."""
+    params = request.params
+    raw_points = params.get("points") or []
+    if not isinstance(raw_points, list):
+        raise ProtocolError(ErrorCode.BAD_REQUEST, "'points' must be a list")
+    try:
+        points = [(float(p[0]), float(p[1])) for p in raw_points]
+        labels = [int(label) for label in (params.get("labels") or [])]
+    except (TypeError, ValueError, IndexError) as exc:
+        raise ProtocolError(ErrorCode.BAD_REQUEST, "malformed points or labels", str(exc)) from exc
+
+    return predictor.segment_at(
+        image=str(params.get("image", "")),
+        points=points,
+        labels=labels,
+        model=str(params.get("model", "")),
+        simplify_tolerance=float(params.get("simplifyTolerance", 1.5)),
+        class_id=int(params.get("classId", 0)),
+    )
+
+
 @method("cancel")
 def _cancel(server: Server, request: Request) -> dict[str, Any]:
     """Cooperative cancel: the target request notices at its next progress checkpoint."""

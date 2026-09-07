@@ -18,12 +18,67 @@ annotation_helper/
 └── package.json   the few commands you need day to day
 ```
 
+## Annotating
+
+Nothing is written until you say so. **Enter**, **Ctrl+S** or **Save** writes the label
+file; the arrow keys only move. That matters most with automatic prediction on: you page
+through images, look at what the model proposes, and only the ones you accept become
+labels. An image you pass by stays "to do", and a prediction you never accepted leaves
+nothing behind. Leaving work you did *by hand* behind says so in a message, because that
+is the one case where moving on is likely a mistake.
+
+| Tool | Key | |
+|---|---|---|
+| Select | `V` | Move, resize, drag vertices. Pull an edge midpoint out for a new point; right-click or double-click a point to delete it |
+| Box | `B` | Drag a rectangle |
+| Polygon | `P` | Click points, Enter or double-click closes |
+| Smart select | `S` | Click an object, get the object — see below |
+| Eraser | `G` | Drag over polygon points to delete them in bulk; `[` and `]` size it |
+| Pan | `H` | Or the middle mouse button, from any tool |
+
+Other keys: `→`/`←` next and previous image, `Space` moves the image to the recycle bin,
+`N` saves it as a verified background (an empty label file is training data, not a gap),
+`F` fits, `E` predicts, `1`–`9` pick a class and re-class the selection, `Ctrl+Z` undoes.
+Settings lists them all.
+
+### Smart select
+
+Click a flower and get the flower. This is [SAM](https://segment-anything.com/) prompted
+by clicks rather than a model trained on your classes, so it works on the first image of
+a brand-new project — before a detection model of your own exists.
+
+- **Left click** what the object is, again to grow it.
+- **Right click** (or Alt+click) what it is *not*, and that part comes off.
+- **Backspace** takes a click back, **Enter** keeps the mask, **Esc** throws it away.
+
+Every click re-asks with the whole set of clicks, so a wrong mask is corrected by
+pointing at what is wrong with it, never by starting over. The image embedding is cached
+per image, so only the first click pays for the encoder.
+
+A mask that falls apart into pieces — a plant the grass cuts up — becomes one polygon per
+piece, all in the active class. A single ring around all of them would have to run
+straight through the grass in between, and a YOLO label is one ring per line anyway.
+
+The model is `mobile_sam.pt` by default; ultralytics downloads it once on first use, so
+that first click needs a network. **Settings → Model for smart select** takes any
+ultralytics name (`sam2.1_b.pt` is slower and sharper) or a path to a `.pt` file.
+
+### Prediction
+
+The **Predict** button runs your own model over the whole image, in one of three
+pipelines (Settings): boxes, polygons, or detect-then-segment, which crops each detection
+and segments the crop — the most useful of the three for small objects.
+
+The switch under the button predicts automatically as soon as an image without labels
+opens, which turns annotating into one review pass. Predicted shapes are marked as such,
+can be removed in one click, and — like everything else — are only written when you save.
+
 ## Requirements
 
 | | |
 |---|---|
 | Node | 20 or newer (`.nvmrc` pins 22; built and verified on 25.7.0) |
-| Python | 3.10 or newer, only for prediction, health check, split and training |
+| Python | 3.10 or newer, only for prediction, smart select, health check, split and training |
 | Compiler | none — there are no native Node modules, so `npm install` never compiles |
 
 On Windows, Python is often present but not on `PATH`, and the `python` that *is* on
@@ -34,6 +89,9 @@ the first that actually answers; if none do, set the interpreter under
 The `npm` scripts below are less forgiving — they call `python` directly. If it is not on
 your `PATH`, run the backend commands with the full path to the interpreter, for example
 `C:\ProgramData\anaconda3\python.exe -m pytest backend/tests -q`.
+
+Prediction, smart select and training need `ultralytics` and `torch`. Settings installs
+them into the app's own directory (CPU or CUDA), or the CUDA build ships with them.
 
 ## Getting started
 
@@ -107,4 +165,18 @@ means and why that matters.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+
+Prediction, smart select and training run on [ultralytics](https://github.com/ultralytics/ultralytics),
+which is AGPL-3.0, and this program is built to use it — so the whole is distributed
+under the same licence. In practice: use it for anything you like, including commercially,
+but if you distribute a modified version, or run one as a network service, the people
+using it are entitled to your source. Ultralytics also sells a commercial licence for
+projects that cannot live with that, and it covers their code, not this program.
+
+Everything else the app is built from — Electron, Svelte, Vite, zod — is MIT or
+Apache-2.0, which AGPL-3.0 accommodates. Model weights carry their own terms: the
+ultralytics YOLO and MobileSAM checkpoints are AGPL-3.0, and a checkpoint you bring
+yourself is yours to check.
+
+Your annotations and your dataset are your own. Nothing in this licence reaches them.

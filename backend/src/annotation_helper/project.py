@@ -59,6 +59,7 @@ class AiSettings:
     max_detections: int = 300
     expand_ratio: float = 0.10  # box growth before the segment crop, pipeline 3 only
     simplify_tolerance: float = 1.5  # pixels; 0 keeps every predicted vertex
+    sam_model: str = "mobile_sam.pt"  # click-to-segment; an ultralytics name or a path
 
 
 @dataclass(slots=True)

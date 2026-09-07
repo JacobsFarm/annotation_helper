@@ -61,15 +61,21 @@
   import { pushToast } from '../lib/state/toast.svelte'
   import {
     activeTool,
+    clearSmart,
     cursorPosition,
     eraserSize,
     ERASER_MAX,
     ERASER_MIN,
+    isSmartBusy,
+    resetDraft,
     setActiveTool,
     setEraserSize,
+    smartClicks,
+    smartPreview,
     stepEraserSize,
     type ToolId
   } from '../lib/state/tool.svelte'
+  import { commit as acceptSmart } from '../lib/canvas/tools/smart'
   import { actualSize, fit, viewport, zoomStep } from '../lib/state/viewport.svelte'
 
   const FILTERS: DatasetFilter[] = ['all', 'todo', 'done']
@@ -81,12 +87,15 @@
 
   const TOOL_BUTTONS: {
     id: ToolId
-    icon: 'select' | 'box' | 'polygon' | 'pan' | 'eraser'
+    icon: 'select' | 'box' | 'polygon' | 'pan' | 'eraser' | 'magic'
     label: string
+    /** Needs the Python engine, so it says so instead of doing nothing when pressed. */
+    needsAi?: boolean
   }[] = [
     { id: 'select', icon: 'select', label: 'annotate_tool_select' },
     { id: 'box', icon: 'box', label: 'annotate_tool_box' },
     { id: 'polygon', icon: 'polygon', label: 'annotate_tool_polygon' },
+    { id: 'smart', icon: 'magic', label: 'annotate_tool_smart', needsAi: true },
     { id: 'erase', icon: 'eraser', label: 'annotate_tool_erase' },
     { id: 'pan', icon: 'pan', label: 'annotate_tool_pan' }
   ]
@@ -110,6 +119,9 @@
     const file = entry?.file ?? null
     if (file === lastLoaded) return
     lastLoaded = file
+    // Whatever was half-drawn belonged to the image you just left, including a smart
+    // selection whose clicks point at pixels that are no longer there.
+    resetDraft()
     if (projectRoot && file) void loadAnnotation(projectRoot, file)
     else clearAnnotation()
   })
@@ -269,6 +281,9 @@
       case 'p':
         pickTool('polygon')
         break
+      case 's':
+        if (canPredict()) pickTool('smart')
+        break
       case 'g':
         pickTool('erase')
         break
@@ -378,6 +393,7 @@
             icon={button.icon}
             title={t(button.label as never)}
             active={activeTool() === button.id}
+            disabled={button.needsAi === true && !canPredict()}
             onclick={() => pickTool(button.id, true)}
           />
         {/each}
@@ -458,6 +474,35 @@
         />
       {:else}
         <div class="empty">{t('annotate_no_images')}</div>
+      {/if}
+
+      <!-- Click-to-segment: accept or discard, where the mask is, not across the screen
+           in a panel. Enter and Esc do the same two things. -->
+      {#if activeTool() === 'smart' && smartClicks().length > 0}
+        <div class="smart-bar">
+          {#if isSmartBusy()}
+            <span class="muted">{t('annotate_smart_working')}</span>
+          {:else}
+            <span class="muted">
+              {t('annotate_smart_clicks', { count: smartClicks().length })}
+              {#if smartPreview().length > 1}
+                · {t('annotate_smart_parts', { count: smartPreview().length })}
+              {/if}
+            </span>
+          {/if}
+          <Button
+            size="sm"
+            variant="primary"
+            icon="check"
+            disabled={smartPreview().length === 0}
+            onclick={acceptSmart}
+          >
+            {t('annotate_smart_accept')}
+          </Button>
+          <Button size="sm" variant="ghost" icon="close" onclick={clearSmart}>
+            {t('annotate_smart_discard')}
+          </Button>
+        </div>
       {/if}
 
       <!-- Brush-size popover, in the corner of the canvas rather than in the toolbar:
@@ -826,6 +871,23 @@
   .canvas {
     min-height: 0;
     position: relative;
+  }
+
+  .smart-bar {
+    position: absolute;
+    left: 50%;
+    bottom: var(--space-3);
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    font-size: var(--text-xs);
+    white-space: nowrap;
   }
 
   .eraser-panel {

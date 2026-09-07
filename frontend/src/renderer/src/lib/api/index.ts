@@ -24,6 +24,8 @@ import type {
   PythonStatus,
   RecentProject,
   RecycleStatus,
+  SegmentPointRequest,
+  SegmentPointResult,
   SplitResult,
   TrainRun
 } from '@shared/ipc'
@@ -94,6 +96,7 @@ export const api: Api = {
   ai: {
     status: () => call<PythonStatus>('ai.status'),
     predict: (input: PredictRequest) => call<PredictResult>('ai.predict', input),
+    segmentPoint: (input: SegmentPointRequest) => call<SegmentPointResult>('ai.segmentPoint', input),
     cancel: () => call<void>('ai.cancel'),
     restart: () => call<PythonStatus>('ai.restart'),
     packages: () => call<PackageStatus>('ai.packages'),

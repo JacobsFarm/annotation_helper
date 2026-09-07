@@ -9,6 +9,11 @@ Three pipelines, selectable per project:
 The third existed in the predecessor as `predict_advanced_dual` and was never wired to
 any button, which is a shame: it is the most useful of the three for small objects,
 because the segmentation model sees a crop instead of a downscaled full frame.
+
+Plus one interactive mode, `segment_at`: click a flower, get the flower. That one is
+prompted by points instead of by a trained class list, so it needs no model of your own
+and works on the first image of a brand-new project - which is exactly the moment a
+detection model does not exist yet.
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from ..geometry import simplify
+from ..geometry import polygon_area, simplify
 from ..shapes import Box, Polygon, Shape
 from .protocol import ErrorCode, ProtocolError
 
@@ -96,9 +101,236 @@ def load_model(path: str):
 
 
 def unload_models() -> int:
-    count = len(_MODEL_CACHE)
+    count = len(_MODEL_CACHE) + (1 if _SAM["predictor"] is not None else 0)
     _MODEL_CACHE.clear()
+    release_sam()
     return count
+
+
+# --- interactive segmentation (SAM) -----------------------------------------
+#
+# The expensive half of SAM is the image encoder, and it does not depend on where you
+# clicked. So the predictor and the embedding of the current image are kept alive
+# between calls: the first click on an image pays for the encoder, every click after it
+# only pays for the mask decoder, which is milliseconds. Without that cache this is a
+# two-second wait per click and nobody would use it twice.
+
+DEFAULT_SAM_MODEL = "mobile_sam.pt"
+"""~40 MB and quick on a CPU. Ultralytics fetches it on first use; `sam2.1_b.pt` and
+friends are better and much heavier, and the project file can name any of them."""
+
+_SAM: dict[str, Any] = {"predictor": None, "model": "", "image": ""}
+
+
+def release_sam() -> None:
+    predictor = _SAM["predictor"]
+    if predictor is not None:
+        try:
+            predictor.reset_image()
+        except Exception:  # a half-built predictor must still be droppable
+            pass
+    _SAM.update(predictor=None, model="", image="")
+
+
+def _sam_predictor(model_name: str, image_path: Path):
+    """A SAM predictor with this image's embedding already computed."""
+    try:
+        from ultralytics.models.sam import Predictor as SAMPredictor  # noqa: PLC0415
+    except ImportError as exc:
+        raise ProtocolError(
+            ErrorCode.MISSING_DEPENDENCY,
+            "ultralytics is not installed",
+            "pip install annotation-helper[ai]",
+        ) from exc
+
+    # SAM 2 checkpoints need their own predictor. Selecting it by name keeps this working
+    # on an ultralytics old enough not to have that class at all.
+    predictor_class = SAMPredictor
+    if "sam2" in model_name.lower():
+        try:
+            from ultralytics.models.sam import SAM2Predictor  # noqa: PLC0415
+
+            predictor_class = SAM2Predictor
+        except ImportError:
+            pass
+
+    if _SAM["predictor"] is None or _SAM["model"] != model_name:
+        release_sam()
+        try:
+            predictor = predictor_class(
+                overrides={
+                    "task": "segment",
+                    "mode": "predict",
+                    "model": model_name,
+                    "imgsz": 1024,
+                    "conf": 0.25,
+                    "save": False,
+                    "verbose": False,
+                }
+            )
+        except Exception as exc:
+            raise ProtocolError(
+                ErrorCode.MODEL_LOAD_FAILED, "could not load the SAM model", str(exc)
+            ) from exc
+        _SAM.update(predictor=predictor, model=model_name, image="")
+
+    predictor = _SAM["predictor"]
+    if _SAM["image"] != str(image_path):
+        # Also where the weights are downloaded and the network is built, so a missing
+        # checkpoint surfaces here rather than as a mystery at the first click.
+        try:
+            predictor.set_image(str(image_path))
+        except Exception as exc:
+            release_sam()
+            raise ProtocolError(
+                ErrorCode.MODEL_LOAD_FAILED,
+                "could not prepare the image for SAM",
+                str(exc),
+            ) from exc
+        _SAM["image"] = str(image_path)
+    return predictor
+
+
+def segment_at(
+    image: str,
+    points: list[tuple[float, float]],
+    labels: list[int],
+    model: str = "",
+    simplify_tolerance: float = 1.5,
+    class_id: int = 0,
+) -> dict[str, Any]:
+    """Segment whatever the clicks point at, and return one polygon.
+
+    `labels` says what each click means: 1 "this is the object", 0 "this is background".
+    Every click is sent again on every call, so the mask is always a function of the
+    whole set - which is what makes a wrong click fixable by clicking again instead of
+    by starting over.
+    """
+    started = time.perf_counter()
+    image_path = Path(image)
+    if not image_path.is_file():
+        raise ProtocolError(ErrorCode.IMAGE_NOT_FOUND, "image not found", image)
+    if not points:
+        raise ProtocolError(ErrorCode.BAD_REQUEST, "no points given")
+    if len(labels) != len(points):
+        raise ProtocolError(ErrorCode.BAD_REQUEST, "points and labels differ in length")
+    if not any(label == 1 for label in labels):
+        raise ProtocolError(ErrorCode.BAD_REQUEST, "at least one positive point is required")
+
+    predictor = _sam_predictor(model or DEFAULT_SAM_MODEL, image_path)
+
+    # One nesting level = one object built from every click. A flat list is read as one
+    # separate object per point, which is the opposite of what a refining click means.
+    flat_points = [[float(x), float(y)] for x, y in points]
+    flat_labels = [int(label) for label in labels]
+    try:
+        results = predictor(points=[flat_points], labels=[flat_labels])
+    except Exception:
+        # An ultralytics old enough to reshape every prompt into one-point-per-object
+        # refuses the nested form. Flat still segments what the first click points at,
+        # which is the common case, so degrade to it rather than to nothing.
+        try:
+            results = predictor(points=flat_points, labels=flat_labels)
+        except Exception as exc:
+            raise ProtocolError(
+                ErrorCode.PREDICT_FAILED, "point segmentation failed", str(exc)
+            ) from exc
+
+    polygons = _sam_polygons(results[0] if results else None, simplify_tolerance, class_id)
+
+    return {
+        "shapes": [p.to_dict() for p in polygons],
+        "ms": int((time.perf_counter() - started) * 1000),
+        "model": model or DEFAULT_SAM_MODEL,
+    }
+
+
+MIN_RING_AREA = 25.0
+"""Square pixels below which a blob is mask noise rather than a piece of the object."""
+
+MIN_RING_SHARE = 0.05
+"""A blob smaller than this fraction of the biggest one is not the thing you clicked."""
+
+MAX_RINGS = 12
+"""Enough for a leaf that grass cuts into pieces; not enough to bury the shape list."""
+
+
+def _mask_rings(masks) -> list[list[list[tuple[float, float]]]]:
+    """Per mask, every disjoint blob as its own ring, in image pixels.
+
+    Deliberately not `masks.xy`. That property *concatenates* the separate contours of
+    one mask into a single list of points, so a plant whose leaves are cut apart by
+    grass comes back as one polygon that jumps from leaf to leaf - and those jumps are
+    exactly the straight lines that run across the image and ruin the outline.
+
+    Falls back to `masks.xy` when OpenCV is somehow missing, which is the old, uglier
+    result rather than no result at all.
+    """
+    try:
+        import cv2  # noqa: PLC0415 - ships with ultralytics, still not worth importing early
+        from ultralytics.utils import ops  # noqa: PLC0415
+    except ImportError:
+        return [[[(float(x), float(y)) for x, y in contour]] for contour in (masks.xy or [])]
+
+    out: list[list[list[tuple[float, float]]]] = []
+    for mask in masks.data.int().cpu().numpy().astype("uint8"):
+        # RETR_EXTERNAL: outlines, not the holes inside them. A YOLO polygon cannot
+        # express a hole anyway, so finding them would only produce unstorable rings.
+        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+        rings: list[list[tuple[float, float]]] = []
+        for contour in contours:
+            points = contour.reshape(-1, 2).astype("float32")
+            if len(points) < 3:
+                continue
+            # The mask is at the network's resolution; a shape is in image pixels. Same
+            # conversion `masks.xy` does, on one contour instead of all of them at once.
+            scaled = ops.scale_coords(mask.shape, points, masks.orig_shape, normalize=False)
+            rings.append([(float(x), float(y)) for x, y in scaled])
+        out.append(rings)
+    return out
+
+
+def _ring_to_polygon(
+    ring: list[tuple[float, float]], tolerance: float, class_id: int
+) -> Polygon | None:
+    points = simplify(ring, tolerance) if tolerance > 0 else list(ring)
+    if len(points) < 3:
+        return None
+    polygon = Polygon(class_id=class_id, points=points, source="ai")
+    return polygon if polygon.area >= MIN_RING_AREA else None
+
+
+def _sam_polygons(result, tolerance: float, class_id: int) -> list[Polygon]:
+    """Masks to polygons, one per disjoint blob, biggest first.
+
+    Unlike `_polygons_from` the class comes from the caller: SAM segments a thing, it
+    does not name it. And unlike a detection, one click can legitimately mean several
+    rings - a weed in grass is one plant and five visible pieces of leaf. They are
+    returned separately because a single ring around all of them would have to cut
+    straight across the grass in between, and because YOLO stores one ring per line.
+    """
+    masks = getattr(result, "masks", None) if result is not None else None
+    if masks is None:
+        return []
+
+    # Several masks are competing answers to the same clicks, not parts of one answer,
+    # so the rings never mix: the mask that covers the most is the one that gets used.
+    per_mask: list[list[Polygon]] = []
+    for rings in _mask_rings(masks):
+        polygons = [
+            polygon
+            for ring in rings
+            if (polygon := _ring_to_polygon(ring, tolerance, class_id)) is not None
+        ]
+        if polygons:
+            per_mask.append(polygons)
+    if not per_mask:
+        return []
+
+    chosen = max(per_mask, key=lambda group: sum(p.area for p in group))
+    chosen.sort(key=lambda p: p.area, reverse=True)
+    floor = chosen[0].area * MIN_RING_SHARE
+    return [p for p in chosen if p.area >= floor][:MAX_RINGS]
 
 
 def predict(image: str, options: PredictOptions, progress: ProgressFn | None = None) -> dict[str, Any]:
@@ -235,9 +467,14 @@ def _run(model, source, options: PredictOptions):
 
 
 def _polygons_from(result, options: PredictOptions, offset: tuple[float, float]) -> list[Polygon]:
-    """Convert ultralytics masks to polygons, offset into full-image coordinates."""
+    """Convert ultralytics masks to polygons, offset into full-image coordinates.
+
+    One detection is one instance and a YOLO polygon is one ring, so a mask that falls
+    apart into several blobs contributes its largest. The rest is mask noise, and
+    stitching them into one ring would write a line straight through the image.
+    """
     masks = getattr(result, "masks", None)
-    if masks is None or masks.xy is None:
+    if masks is None:
         return []
 
     classes = []
@@ -247,12 +484,15 @@ def _polygons_from(result, options: PredictOptions, offset: tuple[float, float])
 
     off_x, off_y = offset
     polygons: list[Polygon] = []
-    for index, contour in enumerate(masks.xy):
-        points = [(float(x) + off_x, float(y) + off_y) for x, y in contour]
-        if len(points) < 3:
+    for index, rings in enumerate(_mask_rings(masks)):
+        if not rings:
             continue
+        biggest = max(rings, key=polygon_area)
+        points = [(x + off_x, y + off_y) for x, y in biggest]
         if options.simplify_tolerance > 0:
             points = simplify(points, options.simplify_tolerance)
+        if len(points) < 3:
+            continue
         raw_class = int(classes[index]) if index < len(classes) else 0
         polygons.append(
             Polygon(class_id=_map_class(raw_class, options), points=points, source="ai")

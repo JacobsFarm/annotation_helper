@@ -1,4 +1,10 @@
-import type { Compute, PredictRequest, PredictResult } from '@shared/ipc'
+import type {
+  Compute,
+  PredictRequest,
+  PredictResult,
+  SegmentPointRequest,
+  SegmentPointResult
+} from '@shared/ipc'
 import { cancelInstall, installPackages, packageStatus } from '../services/package-service'
 import { openProject } from '../services/project-service'
 import { imagePathFor } from '../services/paths'
@@ -28,6 +34,23 @@ handle('ai.predict', async (input: PredictRequest): Promise<PredictResult> => {
   } finally {
     inFlight = null
   }
+})
+
+/**
+ * Click-to-segment. Not registered as `inFlight`: it carries no progress and finishes in
+ * the time a click takes, so there is nothing to cancel and nothing that should be able
+ * to cancel a real prediction running next to it.
+ */
+handle('ai.segmentPoint', async (input: SegmentPointRequest): Promise<SegmentPointResult> => {
+  const project = await openProject(input.root)
+  return call<SegmentPointResult>('segment.point', {
+    image: imagePathFor(project, input.file),
+    points: input.points,
+    labels: input.labels,
+    model: project.ai.samModel,
+    simplifyTolerance: project.ai.simplifyTolerance,
+    classId: input.classId
+  })
 })
 
 handle('ai.cancel', async () => {

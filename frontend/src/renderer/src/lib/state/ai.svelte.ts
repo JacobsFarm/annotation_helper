@@ -7,11 +7,13 @@
  */
 
 import type { Compute, PackageStatus, PythonStatus } from '@shared/ipc'
+import type { PolygonShape } from '@shared/shapes'
 import { api, safeCall } from '../api'
 import { t } from '../i18n/index.svelte'
-import { addPredicted, annotationGeneration } from './annotations.svelte'
-import { project } from './project.svelte'
+import { addPredicted, annotationGeneration, current } from './annotations.svelte'
+import { activeClassId, project } from './project.svelte'
 import { pushToast } from './toast.svelte'
+import { setSmartBusy, setSmartPreview, smartClicks } from './tool.svelte'
 
 let status = $state<PythonStatus>({ available: false, reason: 'not_started' })
 let running = $state(false)
@@ -75,6 +77,55 @@ export async function predictCurrent(file: string): Promise<void> {
   // two images further by the time this returns. Shapes belong to the image they were
   // asked for, and to no other.
   if (result && annotationGeneration() === asked) addPredicted(result.shapes)
+}
+
+// --- click-to-segment -------------------------------------------------------
+//
+// SAM prompted by clicks: point at a flower and get the flower, then correct it by
+// pointing at what it got wrong. Every click re-asks with the full set of clicks, so a
+// reply that arrives after a newer one has been sent is thrown away - out-of-order
+// replies would otherwise show a mask that belongs to a click you already corrected.
+
+let smartSeq = 0
+
+/**
+ * Ask for the mask that fits every click made so far, and show it as a preview. The
+ * preview is not a shape yet: it becomes one when the user accepts it.
+ */
+export async function refineSmartSelection(): Promise<void> {
+  const open = project()
+  const image = current()
+  const clicks = smartClicks()
+  if (!open || !image || clicks.length === 0) return
+
+  const seq = ++smartSeq
+  const asked = annotationGeneration()
+  setSmartBusy(true)
+  const result = await safeCall(() =>
+    api.ai.segmentPoint({
+      root: open.root,
+      file: image.imageFile,
+      points: clicks.map((click) => [click.x, click.y] as [number, number]),
+      labels: clicks.map((click) => (click.positive ? 1 : 0)),
+      classId: activeClassId()
+    })
+  )
+  if (seq !== smartSeq) return // a newer click already went out and owns the busy flag
+  setSmartBusy(false)
+  if (annotationGeneration() !== asked) return // another image opened while we waited
+
+  if (!result) {
+    // The call failed and has already said so. Keep the clicks: the usual causes are
+    // a missing model or a first-use download, and both are worth a retry.
+    return
+  }
+  // One ring per disjoint part of the mask, so a leaf that grass cuts in two is two
+  // rings rather than one outline with a line drawn across the grass between them.
+  const rings = result.shapes
+    .filter((shape): shape is PolygonShape => shape.kind === 'polygon')
+    .map((shape) => shape.points)
+  setSmartPreview(rings)
+  if (rings.length === 0) pushToast('info', t('annotate_smart_empty'))
 }
 
 export async function cancelPredict(): Promise<void> {

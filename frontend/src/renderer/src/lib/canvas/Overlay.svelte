@@ -8,7 +8,7 @@
   import type { PolygonShape, Shape } from '@shared/shapes'
   import { normaliseBox } from '@shared/shapes'
   import { boxHandles, edgeMidpoints, MIDPOINT_MIN_EDGE } from './tools/select'
-  import type { DraftBox, HandleHover } from '../state/tool.svelte'
+  import type { DraftBox, HandleHover, SmartPoint } from '../state/tool.svelte'
 
   interface Props {
     selected: Shape | null
@@ -23,6 +23,10 @@
     eraser?: number | null
     /** Polygons whose points to show even though they are not selected. */
     ghosts?: PolygonShape[]
+    /** Click-to-segment: the clicks, and the mask they currently produce. */
+    smartClicks?: SmartPoint[]
+    /** One ring per disjoint part of the mask. */
+    smartPreview?: [number, number][][]
   }
 
   const {
@@ -35,7 +39,9 @@
     image,
     showCrosshair,
     eraser = null,
-    ghosts = []
+    ghosts = [],
+    smartClicks = [],
+    smartPreview = []
   }: Props = $props()
 
   const stroke = $derived(1.5 / scale)
@@ -73,6 +79,40 @@
     stroke-dasharray="{4 / scale} {3 / scale}"
   />
 {/if}
+
+<!-- Click-to-segment. The mask is drawn filled rather than outlined: it is a proposal
+     about an area, and an outline would read as a finished polygon. -->
+{#each smartPreview as ring, index (index)}
+  {#if ring.length >= 3}
+    <polygon
+      class="smart-mask"
+      points={ring.map(([x, y]) => `${x},${y}`).join(' ')}
+      stroke-width={stroke * 1.5}
+    />
+  {/if}
+{/each}
+
+{#each smartClicks as click, index (index)}
+  <circle
+    class="smart-click"
+    class:negative={!click.positive}
+    cx={click.x}
+    cy={click.y}
+    r={handleSize * 0.7}
+    stroke-width={stroke * 1.5}
+  />
+  {#if !click.positive}
+    <!-- A minus sign, so "not this" survives being colour-blind or a small screen. -->
+    <line
+      class="smart-sign"
+      x1={click.x - handleSize * 0.35}
+      y1={click.y}
+      x2={click.x + handleSize * 0.35}
+      y2={click.y}
+      stroke-width={stroke * 1.5}
+    />
+  {/if}
+{/each}
 
 {#if draft}
   <rect
@@ -163,6 +203,27 @@
     fill: var(--danger);
     fill-opacity: 0.1;
     stroke: var(--danger);
+  }
+
+  .smart-mask {
+    fill: var(--brand);
+    fill-opacity: 0.28;
+    stroke: var(--brand);
+    stroke-dasharray: 6 3;
+  }
+
+  .smart-click {
+    fill: var(--brand);
+    stroke: var(--bg-raised);
+  }
+
+  .smart-click.negative {
+    fill: var(--danger);
+  }
+
+  .smart-sign {
+    stroke: var(--bg-raised);
+    stroke-linecap: round;
   }
 
   .draft {

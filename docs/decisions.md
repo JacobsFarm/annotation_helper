@@ -35,12 +35,20 @@ it; the switch touches `python-service.ts` and `electron-builder.yml` only.
 
 ### 4. Licence
 
-**MIT.** Chosen deliberately rather than inherited: nothing here is a fork, and none of
-the runtime dependencies (Electron, Svelte, Vite, zod) imposes copyleft. Note that
-`ultralytics` is AGPL-3.0 and is an *optional* extra, imported lazily and never bundled —
-so this repository does not distribute it. If you ship a product that bundles
-ultralytics weights or code, that is your licence obligation to work out, not this
-tool's.
+**AGPL-3.0-only.** This replaces the original MIT, and the reason it changed is the
+interesting part.
+
+MIT was chosen on the premise that `ultralytics` was an optional extra: imported lazily,
+never bundled, so the repository distributed no AGPL code and inherited no copyleft. That
+premise no longer holds. Settings installs ultralytics and torch into the app's own
+directory, the CUDA build ships them inside the installer, and the model-assisted half of
+the app — predict, automatic prediction, smart select, training — is built to use it
+rather than to work without it. A build that carries AGPL code and is designed around it
+is a combined work, so the whole goes out under the same licence.
+
+What stays true: the Electron/Svelte/Vite/zod side is MIT or Apache-2.0 and sits happily
+under AGPL-3.0, manual annotation still runs with no Python at all, and the licence
+reaches the program, never the datasets people make with it.
 
 ### 5. Target dataset size
 

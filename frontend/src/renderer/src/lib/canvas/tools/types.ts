@@ -30,6 +30,7 @@ export interface Tool {
     | 'annotate_hint_polygon'
     | 'annotate_hint_pan'
     | 'annotate_hint_erase'
+    | 'annotate_hint_smart'
   onPointerDown(event: ToolEvent): void
   onPointerMove(event: ToolEvent): void
   onPointerUp(event: ToolEvent): void

@@ -20,7 +20,9 @@
     handleHover,
     polygonDraft,
     setCursorPosition,
-    setHandleHover
+    setHandleHover,
+    smartClicks,
+    smartPreview
   } from '../state/tool.svelte'
   import { fit, pan, setContainer, viewport, zoom } from '../state/viewport.svelte'
 
@@ -196,6 +198,8 @@
         {showCrosshair}
         eraser={activeTool() === 'erase' ? eraserRadius(view.scale) : null}
         ghosts={eraserGhosts}
+        smartClicks={smartClicks()}
+        smartPreview={smartPreview()}
       />
     </svg>
   </div>

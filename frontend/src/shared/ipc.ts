@@ -177,6 +177,32 @@ export interface PredictResult {
   pipeline: string
 }
 
+/**
+ * One round of click-to-segment. Every click made so far is sent again, because the
+ * mask is a function of the whole set of clicks and not of the last one.
+ */
+export interface SegmentPointRequest {
+  root: string
+  /** Image path relative to the project's images directory. */
+  file: string
+  /** Clicks in image pixels. */
+  points: [number, number][]
+  /** 1 = part of the object, 0 = background. Same length as `points`. */
+  labels: number[]
+  classId: number
+}
+
+export interface SegmentPointResult {
+  /**
+   * One polygon per disjoint part of the mask, biggest first. Several is normal: a
+   * plant that grass cuts into pieces is one object and several rings, and a ring
+   * around all of them would have to run straight through the grass in between.
+   */
+  shapes: Shape[]
+  ms: number
+  model: string
+}
+
 export interface TrainRun {
   id: string
   command: string[]
@@ -254,6 +280,7 @@ export interface Api {
   ai: {
     status(): Promise<PythonStatus>
     predict(input: PredictRequest): Promise<PredictResult>
+    segmentPoint(input: SegmentPointRequest): Promise<SegmentPointResult>
     cancel(): Promise<void>
     restart(): Promise<PythonStatus>
     packages(): Promise<PackageStatus>

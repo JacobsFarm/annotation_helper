@@ -38,7 +38,7 @@
   import { settings, updateSettings } from '../lib/state/settings.svelte'
   import { pushToast } from '../lib/state/toast.svelte'
 
-  const SHORTCUTS: { keys: string; label: 'shortcut_next' | 'shortcut_previous' | 'shortcut_save' | 'shortcut_skip' | 'shortcut_delete' | 'shortcut_tool_select' | 'shortcut_tool_box' | 'shortcut_tool_polygon' | 'shortcut_tool_erase' | 'shortcut_eraser_size' | 'shortcut_fit' | 'shortcut_background' | 'shortcut_predict' | 'shortcut_undo' | 'shortcut_class' }[] = [
+  const SHORTCUTS: { keys: string; label: 'shortcut_next' | 'shortcut_previous' | 'shortcut_save' | 'shortcut_skip' | 'shortcut_delete' | 'shortcut_tool_select' | 'shortcut_tool_box' | 'shortcut_tool_polygon' | 'shortcut_tool_smart' | 'shortcut_tool_erase' | 'shortcut_eraser_size' | 'shortcut_fit' | 'shortcut_background' | 'shortcut_predict' | 'shortcut_undo' | 'shortcut_class' }[] = [
     { keys: '→ / PageDown', label: 'shortcut_next' },
     { keys: '← / PageUp', label: 'shortcut_previous' },
     { keys: 'Enter / Ctrl+S', label: 'shortcut_save' },
@@ -47,6 +47,7 @@
     { keys: 'V', label: 'shortcut_tool_select' },
     { keys: 'B', label: 'shortcut_tool_box' },
     { keys: 'P', label: 'shortcut_tool_polygon' },
+    { keys: 'S', label: 'shortcut_tool_smart' },
     { keys: 'G', label: 'shortcut_tool_erase' },
     { keys: '[ / ]', label: 'shortcut_eraser_size' },
     { keys: 'F', label: 'shortcut_fit' },
@@ -285,6 +286,13 @@
         value={open?.ai.segmentModel ?? ''}
         filters={[{ name: 'PyTorch', extensions: ['pt'] }]}
         onchange={(value) => patchAi({ segmentModel: value })}
+      />
+    </Field>
+    <Field label={t('settings_sam_model')} hint={t('settings_sam_model_hint')}>
+      <input
+        type="text"
+        value={open?.ai.samModel ?? 'mobile_sam.pt'}
+        onchange={(event) => patchAi({ samModel: event.currentTarget.value })}
       />
     </Field>
 

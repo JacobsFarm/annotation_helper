@@ -66,6 +66,13 @@ const nl: Record<keyof typeof en, string> = {
   annotate_tool_polygon: 'Polygoon',
   annotate_tool_pan: 'Verschuiven',
   annotate_tool_erase: 'Gum',
+  annotate_tool_smart: 'Slim selecteren',
+  annotate_smart_accept: 'Overnemen',
+  annotate_smart_discard: 'Weggooien',
+  annotate_smart_working: 'Bezig met segmenteren…',
+  annotate_smart_clicks: '{count} klikken',
+  annotate_smart_parts: '{count} delen',
+  annotate_smart_empty: 'Daar vond het model geen object. Probeer een andere klik.',
   annotate_eraser: 'Gum',
   annotate_eraser_size: 'Grootte',
   annotate_eraser_keys: '[ en ] maken de gum kleiner en groter.',
@@ -129,6 +136,8 @@ const nl: Record<keyof typeof en, string> = {
   annotate_hint_pan: 'Sleep om te verschuiven. De middelste muisknop doet dit altijd.',
   annotate_hint_erase:
     'Sleep over de punten om ze te wissen. Werkt op de geselecteerde polygoon; een polygoon houdt minstens drie punten over. [ en ] wijzigen de grootte.',
+  annotate_hint_smart:
+    'Klik op het object om het te selecteren. Rechtsklik (of Alt+klik) op wat er niet bij hoort, Backspace haalt een klik terug. Enter neemt het masker over, Esc gooit het weg.',
 
   // --- dataset ---
   dataset_title: 'Dataset',
@@ -227,6 +236,9 @@ const nl: Record<keyof typeof en, string> = {
     'De derde pijplijn snijdt rond elke detectie uit vóór het segmenteren, wat merkbaar beter is voor kleine objecten.',
   settings_detect_model: 'Detectiemodel',
   settings_segment_model: 'Segmentatiemodel',
+  settings_sam_model: 'Model voor slim selecteren (SAM)',
+  settings_sam_model_hint:
+    'Een ultralytics-naam die bij het eerste gebruik één keer wordt gedownload: mobile_sam.pt is klein en snel, sam2.1_b.pt is trager en scherper. Een pad naar een .pt-bestand mag ook.',
   settings_confidence: 'Betrouwbaarheid',
   settings_iou: 'IoU',
   settings_max_detections: 'Maximum aantal detecties',
@@ -275,6 +287,7 @@ const nl: Record<keyof typeof en, string> = {
   shortcut_tool_select: 'Selectiegereedschap',
   shortcut_tool_box: 'Boxgereedschap',
   shortcut_tool_polygon: 'Polygoongereedschap',
+  shortcut_tool_smart: 'Slim selecteren',
   shortcut_tool_erase: 'Gum',
   shortcut_eraser_size: 'Grootte van de gum',
   shortcut_fit: 'Passend maken',

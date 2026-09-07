@@ -49,7 +49,9 @@ export const aiSettingsSchema = z
     iou: z.number().min(0).max(1).default(0.45),
     maxDetections: z.number().int().min(1).default(300),
     expandRatio: z.number().min(0).max(2).default(0.1),
-    simplifyTolerance: z.number().min(0).default(1.5)
+    simplifyTolerance: z.number().min(0).default(1.5),
+    /** Click-to-segment. An ultralytics asset name (downloaded on first use) or a path. */
+    samModel: z.string().default('mobile_sam.pt')
   })
   .default({})
 

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "YOLO annotation engine: label I/O, dataset tools, training and an AI sidecar."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0-only" }
 dependencies = []
 
 # The core (labels, dataset tools, project files) deliberately has zero dependencies,

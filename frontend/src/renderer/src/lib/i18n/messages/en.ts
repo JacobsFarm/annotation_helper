@@ -67,6 +67,13 @@ export default {
   annotate_tool_polygon: 'Polygon',
   annotate_tool_pan: 'Pan',
   annotate_tool_erase: 'Eraser',
+  annotate_tool_smart: 'Smart select',
+  annotate_smart_accept: 'Keep',
+  annotate_smart_discard: 'Discard',
+  annotate_smart_working: 'Segmenting…',
+  annotate_smart_clicks: '{count} clicks',
+  annotate_smart_parts: '{count} parts',
+  annotate_smart_empty: 'No object found there. Try another click.',
   annotate_eraser: 'Eraser',
   annotate_eraser_size: 'Size',
   annotate_eraser_keys: '[ and ] make the eraser smaller and bigger.',
@@ -129,6 +136,8 @@ export default {
   annotate_hint_pan: 'Drag to pan. The middle mouse button does this from any tool.',
   annotate_hint_erase:
     'Drag over points to erase them. Works on the selected polygon; a polygon keeps at least three points. [ and ] resize the eraser.',
+  annotate_hint_smart:
+    'Click the object to select it. Right-click (or Alt+click) the parts it should not include, Backspace takes a click back. Enter keeps the mask, Esc throws it away.',
 
   // --- dataset ---
   dataset_title: 'Dataset',
@@ -227,6 +236,9 @@ export default {
     'The third pipeline crops around every detection before segmenting, which is markedly better for small objects.',
   settings_detect_model: 'Detection model',
   settings_segment_model: 'Segmentation model',
+  settings_sam_model: 'Smart select model (SAM)',
+  settings_sam_model_hint:
+    'An ultralytics name, downloaded once on first use: mobile_sam.pt is small and quick, sam2.1_b.pt is slower and sharper. A path to a .pt file works too.',
   settings_confidence: 'Confidence',
   settings_iou: 'IoU',
   settings_max_detections: 'Maximum detections',
@@ -274,6 +286,7 @@ export default {
   shortcut_tool_select: 'Select tool',
   shortcut_tool_box: 'Box tool',
   shortcut_tool_polygon: 'Polygon tool',
+  shortcut_tool_smart: 'Smart select',
   shortcut_tool_erase: 'Eraser',
   shortcut_eraser_size: 'Eraser size',
   shortcut_fit: 'Fit to window',

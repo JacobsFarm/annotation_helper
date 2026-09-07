@@ -8,7 +8,7 @@
 
 import { clamp } from '@shared/geometry'
 
-export type ToolId = 'select' | 'box' | 'polygon' | 'pan' | 'erase'
+export type ToolId = 'select' | 'box' | 'polygon' | 'pan' | 'erase' | 'smart'
 
 export interface DraftBox {
   x1: number
@@ -78,6 +78,57 @@ export function setHandleHover(next: HandleHover | null): void {
   hover = next
 }
 
+// --- click-to-segment ---------------------------------------------------------
+//
+// The clicks and the mask they produced. Both live here rather than inside the tool for
+// the same reason the polygon draft does: the overlay renders them without knowing which
+// tool put them there.
+
+export interface SmartPoint {
+  x: number
+  y: number
+  /** false is a "not this" click: the background the mask wrongly swallowed. */
+  positive: boolean
+}
+
+let smartPoints = $state<SmartPoint[]>([])
+/**
+ * The mask, as one ring per disjoint part. A weed in grass is one plant and five
+ * visible pieces of leaf, and a single ring around all of them would have to cut
+ * straight across the grass in between.
+ */
+let smartMask = $state<[number, number][][]>([])
+let smartBusy = $state(false)
+
+export function smartClicks(): SmartPoint[] {
+  return smartPoints
+}
+
+export function setSmartClicks(next: SmartPoint[]): void {
+  smartPoints = next
+}
+
+export function smartPreview(): [number, number][][] {
+  return smartMask
+}
+
+export function setSmartPreview(rings: [number, number][][]): void {
+  smartMask = rings
+}
+
+export function isSmartBusy(): boolean {
+  return smartBusy
+}
+
+export function setSmartBusy(busy: boolean): void {
+  smartBusy = busy
+}
+
+export function clearSmart(): void {
+  smartPoints = []
+  smartMask = []
+}
+
 // --- the eraser ---------------------------------------------------------------
 //
 // Its size is the diameter, in *screen* pixels, the way a brush size reads in an image
@@ -112,8 +163,9 @@ export function resetDraft(): void {
   draftBox = null
   draftPoints = []
   hover = null
+  clearSmart()
 }
 
 export function hasDraft(): boolean {
-  return draftBox !== null || draftPoints.length > 0
+  return draftBox !== null || draftPoints.length > 0 || smartPoints.length > 0
 }
